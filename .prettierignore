@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+bun.lock
+.env
+.env.*
+!.env.example
+backend/prisma/migrations

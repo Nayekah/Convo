@@ -1,0 +1,31 @@
+{
+  "name": "convo-backend",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "test:jwt": "tsx --test src/lib/jwt.test.ts",
+    "start": "node dist/index.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "@hono/zod-openapi": "^1.1.5",
+    "@prisma/client": "6.19.0",
+    "dotenv": "^17.2.3",
+    "hono": "^4.10.1",
+    "zod": "^4.1.12"
+  },
+  "overrides": {
+    "esbuild": "^0.25.11"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.2",
+    "prisma": "6.19.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
