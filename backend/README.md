@@ -1,14 +1,15 @@
 # Convo Backend
 
-The Convo backend is a Hono, TypeScript, and Prisma service that handles authentication, user key metadata storage, password hashing, and JWT issuance for the Convo web client.
+The Convo backend is a Hono, TypeScript, and Prisma service that handles authentication, user key metadata storage, scrypt password hashing, JWT issuance, and planned encrypted chat delivery for the Convo web client.
 
 ## Responsibilities
 
 - Register users with email, password hash, password salt, ECDH public key, encrypted ECDH private key, and key-recovery metadata.
-- Authenticate users with salted password verification.
-- Issue JWS JWT access tokens signed with the custom ES256 JWT library.
-- Verify access tokens for protected routes.
+- Authenticate users with salted scrypt password verification.
+- Issue JWS JWT access tokens signed with ES256.
+- Verify Bearer access tokens for protected routes.
 - Store user records in PostgreSQL through Prisma.
+- Planned: store encrypted message envelopes and relay them over WebSocket without plaintext access.
 
 ## Tech Stack
 
@@ -19,7 +20,10 @@ The Convo backend is a Hono, TypeScript, and Prisma service that handles authent
 - PostgreSQL
 - Zod
 - Node `crypto`
+- Node.js `node:test` for JWT unit tests
 - Custom JWT library with ES256, ES384, and ES512 support
+
+The JWT library supports ES256, ES384, and ES512 because the assignment table requires those algorithms. The application authentication flow itself only issues and accepts ES256 tokens.
 
 ## Environment
 
@@ -40,6 +44,8 @@ Required variables include:
 - `JWT_PUBLIC_KEY`
 
 When running through Docker Compose, the backend receives its environment from the root `docker-compose.yml`. When running the backend directly, `src/configs/env.config.ts` loads the root `.env` file explicitly.
+
+For VPS deployment, use a separate uncommitted `.env.production` with production origins, fresh JWT keys, and strong PostgreSQL credentials.
 
 ## Local Development
 
@@ -66,6 +72,8 @@ http://localhost:9173
 
 The public application should call the backend through `/api/*` via the reverse proxy or Vite dev proxy.
 
+Local development uses the same root `docker-compose.yml` as the full stack. PostgreSQL is published to `127.0.0.1:5532` for the backend running outside Docker.
+
 ## API Routes
 
 The backend is mounted under `/api`.
@@ -74,6 +82,15 @@ The backend is mounted under `/api`.
 POST /api/auth/signup
 POST /api/auth/signin
 GET  /api/auth/me
+```
+
+Planned chat routes:
+
+```text
+GET  /api/contacts
+POST /api/conversations
+GET  /api/conversations/:conversationId/messages
+WS   /api/ws
 ```
 
 `GET /api/auth/me` requires:
@@ -87,22 +104,34 @@ Authorization: Bearer <access-token>
 Sign-up:
 
 1. The frontend generates ECDH key material with Web Crypto API.
-2. The frontend encrypts the ECDH private key before submission.
-3. The backend hashes the password with a unique salt.
+2. The frontend derives a private-key wrapping key with PBKDF2-SHA-256.
+3. The frontend encrypts the ECDH private key with AES-256-GCM before submission.
+4. The backend hashes the password with scrypt and a unique salt.
 4. The backend stores the public key, encrypted private key, and private-key encryption metadata.
-5. The backend returns a signed JWT access token.
+5. The backend returns a signed ES256 JWT access token.
 
 Sign-in:
 
 1. The backend looks up the user by email.
-2. The backend verifies the submitted password against the stored salted hash.
-3. The backend returns a new signed JWT access token.
+2. The backend verifies the submitted password against the stored salted scrypt hash.
+3. The backend returns a new signed ES256 JWT access token.
 
 Protected route access:
 
-1. The client sends the JWT in the `Authorization` header.
+1. The client sends the JWT in the `Authorization: Bearer <token>` header.
 2. The auth middleware verifies the token with `JWT_PUBLIC_KEY`.
-3. The decoded token payload is attached to the request context.
+3. The middleware allows ES256 application tokens only.
+4. The decoded token payload is attached to the request context.
+
+Cookies are allowed by the assignment, but are not required. This backend currently uses Bearer JWT authentication.
+
+Planned chat security:
+
+1. The backend returns peer public keys and conversation metadata.
+2. The client derives ECDH and HKDF chat keys in the browser.
+3. The backend receives only ciphertext, IV, MAC, sender/receiver IDs, and timestamps.
+4. The backend stores encrypted envelopes and relays them over WebSocket.
+5. The backend never receives plaintext messages, ECDH shared secrets, AES keys, or HMAC keys.
 
 ## JWT Library
 
@@ -121,11 +150,15 @@ It implements:
 - RFC 7519 section 7.2 validation behavior relevant to JWS
 - Registered claim validation for `iss`, `sub`, `aud`, `exp`, `nbf`, `iat`, and `jti`
 
+Application auth uses ES256 only even though the library supports all three required algorithms.
+
 JWT unit tests are located in:
 
 ```text
 src/lib/jwt.test.ts
 ```
+
+They use Node.js `node:test`, which satisfies the assignment bonus because the unit test framework is free-choice.
 
 ## Scripts
 
@@ -160,6 +193,13 @@ The main user table stores:
 - private-key KDF metadata
 - private-key cipher metadata
 
+Planned chat tables:
+
+- `Conversation`: ordered user pair, public HKDF salt, timestamps.
+- `Message`: conversation ID, sender ID, receiver ID, ciphertext, IV, MAC, algorithm metadata, timestamp.
+
+No plaintext message column should be added.
+
 ## Source Layout
 
 ```text
@@ -179,5 +219,3 @@ src/
 ## Production Notes
 
 The backend container exposes port `9173` only inside Docker networking. The root reverse proxy is the public entrypoint and forwards `/api/*` requests to the backend.
-
-Do not commit real deployment secrets. Generate a fresh JWT key pair and set it in the root `.env` file or the deployment secret manager.
