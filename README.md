@@ -307,7 +307,9 @@ bun run test:jwt
 ## Contact
 
 Nayaka Ghana Subrata <13523090@std.stei.itb.ac.id>
+
 Aldoy Fauzan Avanza <18223113@std.stei.itb.ac.id>
+
 Mahesa Satria Prayata <18223082@std.stei.itb.ac.id>
 
 ---

@@ -24,3 +24,29 @@ model User {
 
   @@map("users")
 }
+
+model Conversation {
+  id                        String   @id @default(uuid())
+  userAId                   String   @map("user_a_id")
+  userBId                   String   @map("user_b_id")
+  hkdfSalt                  String   @map("hkdf_salt")
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("conversations")
+  @@unique([userAId, userBId], map: "conversations_usera_userb_unique")
+}
+
+model Message {
+  id                        String   @id @default(uuid())
+  conversationId            String   @map("conversation_id")
+  senderId                  String   @map("sender_id")
+  receiverId                String   @map("receiver_id")
+  ciphertext                String   @map("ciphertext")
+  iv                        String   @map("iv")
+  mac                       String   @map("mac")
+  algorithm                 String   @map("algorithm")
+  sentAt                    DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
+
+  @@map("messages")
+}

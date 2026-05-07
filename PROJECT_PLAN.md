@@ -105,32 +105,6 @@ This plan is based on the current codebase.
 
 ## 4. Practical Implementation Steps
 
-### Step 1: Add Database Models
-
-Extend Prisma with:
-
-- `Conversation`
-  - `id`
-  - `userAId`
-  - `userBId`
-  - `hkdfSalt`
-  - `createdAt`
-  - `updatedAt`
-  - unique ordered pair constraint on `userAId` + `userBId`
-
-- `Message`
-  - `id`
-  - `conversationId`
-  - `senderId`
-  - `receiverId`
-  - `ciphertext`
-  - `iv`
-  - `mac`
-  - `algorithm`
-  - `sentAt`
-
-Implementation rule: order participant IDs before creating a conversation so `(A, B)` and `(B, A)` resolve to the same row.
-
 ### Step 2: Add Backend REST APIs
 
 - Add `GET /api/contacts`.
