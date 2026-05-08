@@ -44,7 +44,6 @@ export const SignUpPage = () => {
         ...cryptoBundle,
       });
 
-      localStorage.setItem('convo_access_token', response.token);
       localStorage.setItem(
         'convo_auth_user',
         JSON.stringify({ ...response.user, username }),

@@ -29,7 +29,6 @@ export const SignInPage = () => {
 
     try {
       const response = await authApi.signIn({ email, password });
-      localStorage.setItem('convo_access_token', response.token);
       localStorage.setItem('convo_auth_user', JSON.stringify(response.user));
       navigate('/');
     } catch (requestError) {

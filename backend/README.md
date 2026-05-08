@@ -6,7 +6,7 @@ The Convo backend is a Hono, TypeScript, and Prisma service that handles authent
 
 - Register users with email, password hash, password salt, ECDH public key, encrypted ECDH private key, and key-recovery metadata.
 - Authenticate users with salted password verification.
-- Issue JWS JWT access tokens signed with the custom ES256 JWT library.
+- Issue JWS JWT access tokens signed with the custom ES256 JWT library in `HttpOnly` cookies.
 - Verify access tokens for protected routes.
 - Store user records in PostgreSQL through Prisma.
 
@@ -76,7 +76,7 @@ POST /api/auth/signin
 GET  /api/auth/me
 ```
 
-`GET /api/auth/me` requires:
+`GET /api/auth/me` requires the `convo_access_token` cookie. Bearer tokens are still accepted for development tooling:
 
 ```text
 Authorization: Bearer <access-token>
@@ -90,17 +90,17 @@ Sign-up:
 2. The frontend encrypts the ECDH private key before submission.
 3. The backend hashes the password with a unique salt.
 4. The backend stores the public key, encrypted private key, and private-key encryption metadata.
-5. The backend returns a signed JWT access token.
+5. The backend sets a signed JWT access token in an `HttpOnly` cookie.
 
 Sign-in:
 
 1. The backend looks up the user by email.
 2. The backend verifies the submitted password against the stored salted hash.
-3. The backend returns a new signed JWT access token.
+3. The backend sets a new signed JWT access token in an `HttpOnly` cookie.
 
 Protected route access:
 
-1. The client sends the JWT in the `Authorization` header.
+1. The browser sends the JWT in the `HttpOnly` `convo_access_token` cookie.
 2. The auth middleware verifies the token with `JWT_PUBLIC_KEY`.
 3. The decoded token payload is attached to the request context.
 

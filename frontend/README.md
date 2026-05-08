@@ -8,7 +8,7 @@ The Convo frontend is a React, Vite, and TypeScript application for the web chat
 - Generate the user's ECDH key pair during sign-up with the Web Crypto API.
 - Encrypt the exported ECDH private key before sending it to the backend.
 - Send authentication requests to the backend through the `/api` reverse-proxy path.
-- Store the issued access token in `localStorage` as `convo_access_token`.
+- Rely on the backend-issued `HttpOnly` authentication cookie for authenticated requests.
 
 ## Tech Stack
 

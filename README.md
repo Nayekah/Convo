@@ -230,17 +230,17 @@ Husky runs:
 - Frontend generates an ECDH key pair.
 - Frontend encrypts the exported private key using AES-256-GCM.
 - Backend stores the public key, encrypted private key, password hash, salts, and metadata.
-- Backend returns a signed JWT access token.
+- Backend issues a signed JWT access token in an `HttpOnly` cookie.
 
 ### Login
 
 - User submits email and password.
 - Backend verifies the salted password hash.
-- Backend returns a signed JWT access token.
+- Backend issues a signed JWT access token in an `HttpOnly` cookie.
 
 ### Protected API Access
 
-- Client sends `Authorization: Bearer <token>`.
+- Browser sends the `HttpOnly` auth cookie with API requests.
 - Backend verifies the JWT signature and registered claims.
 - Protected route handlers receive the decoded authentication payload.
 
@@ -257,6 +257,7 @@ Husky runs:
 
 - Do not commit `.env`.
 - Do not commit real JWT private keys.
+- Store JWTs in `HttpOnly` cookies instead of browser-readable storage.
 - Generate fresh keys for every deployment.
 - Keep `BACKEND_HOST_BIND=127.0.0.1` for public deployments.
 - Keep `POSTGRES_HOST_BIND=127.0.0.1` for public deployments.

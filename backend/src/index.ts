@@ -13,6 +13,7 @@ app.use(
     origin: env.FRONTEND_ORIGIN,
     allowMethods: ['GET', 'POST', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
     maxAge: 86400,
   }),
 );
