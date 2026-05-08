@@ -64,7 +64,7 @@ The backend runs at:
 http://localhost:9173
 ```
 
-The public application should call the backend through `/api/*` via the reverse proxy or Vite dev proxy.
+The public Docker application should call the backend through `/api/*` via the HTTPS reverse proxy at `https://localhost`.
 
 ## API Routes
 
@@ -76,7 +76,7 @@ POST /api/auth/signin
 GET  /api/auth/me
 ```
 
-`GET /api/auth/me` requires the `convo_access_token` cookie. Bearer tokens are still accepted for development tooling:
+`GET /api/auth/me` requires the `__Host-convo_access_token` cookie. Bearer tokens are still accepted for development tooling:
 
 ```text
 Authorization: Bearer <access-token>
@@ -100,7 +100,7 @@ Sign-in:
 
 Protected route access:
 
-1. The browser sends the JWT in the `HttpOnly` `convo_access_token` cookie.
+1. The browser sends the JWT in the `HttpOnly` `__Host-convo_access_token` cookie.
 2. The auth middleware verifies the token with `JWT_PUBLIC_KEY`.
 3. The decoded token payload is attached to the request context.
 

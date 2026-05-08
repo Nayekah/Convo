@@ -35,7 +35,7 @@ The frontend reads `VITE_API_BASE_URL` from the root `.env`. The default value i
 VITE_API_BASE_URL=/api
 ```
 
-This value is intentionally relative. In Docker, Nginx routes `/api/*` to the backend. In local development, Vite proxies `/api/*` to `http://localhost:9173`.
+This value is intentionally relative. In Docker, Caddy routes `/api/*` to the backend. In local development, Vite proxies `/api/*` to `http://localhost:9173`.
 
 ## Local Development
 

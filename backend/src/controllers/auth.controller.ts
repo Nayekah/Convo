@@ -14,7 +14,7 @@ import { createRouter } from '../utils/router-factory';
 
 export const authRouter = createRouter();
 
-const ACCESS_TOKEN_COOKIE = 'convo_access_token';
+const ACCESS_TOKEN_COOKIE = '__Host-convo_access_token';
 
 const createAccessToken = (payload: { userId: string; email: string }) => {
   const now = Math.floor(Date.now() / 1000);
@@ -45,7 +45,7 @@ const setAccessTokenCookie = (c: Context, token: string) => {
     maxAge: env.JWT_ACCESS_TOKEN_TTL_SECONDS,
     path: '/',
     sameSite: 'Lax',
-    secure: env.FRONTEND_ORIGIN.startsWith('https://'),
+    secure: true,
   });
 };
 

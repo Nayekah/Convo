@@ -14,7 +14,7 @@ const factory = createFactory<{
 export const authMiddleware = () => {
   return factory.createMiddleware(async (c, next) => {
     const authHeader = c.req.header('Authorization');
-    const cookieToken = getCookie(c, 'convo_access_token');
+    const cookieToken = getCookie(c, '__Host-convo_access_token');
     const bearerToken = authHeader?.startsWith('Bearer ')
       ? authHeader.slice(7)
       : undefined;
