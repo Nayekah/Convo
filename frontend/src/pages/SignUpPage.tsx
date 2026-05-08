@@ -6,8 +6,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AppNavbar } from '../components/NavBar';
 import { WhiteBoxLogo } from '../components/WhiteBoxLogo';
 import { ApiError, authApi } from '../lib/api';
-import { createEncryptedEcdhKeys } from '../lib/crypto-api';
+import {
+  createEncryptedEcdhKeys,
+  decryptPrivateKey,
+  importPrivateEcdhKey,
+} from '../lib/crypto-api';
 import { usePageMeta } from '../lib/page-meta';
+import { setPrivateKey, setUser } from '../lib/session';
 
 export const SignUpPage = () => {
   usePageMeta({
@@ -44,11 +49,18 @@ export const SignUpPage = () => {
         ...cryptoBundle,
       });
 
-      localStorage.setItem(
-        'convo_auth_user',
-        JSON.stringify({ ...response.user, username }),
-      );
-      navigate('/');
+      const pkcs8 = await decryptPrivateKey(password, response.user);
+      const privateKey = await importPrivateEcdhKey(pkcs8);
+
+      setUser({
+        id: response.user.id,
+        email: response.user.email,
+        publicKey: response.user.publicKey,
+        createdAt: response.user.createdAt,
+      });
+      setPrivateKey(privateKey);
+
+      navigate('/contacts');
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.status < 500) {
         setError('Unable to create account');
