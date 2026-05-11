@@ -1,21 +1,10 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { RequireAuth } from './components/RequireAuth';
+import { ContactsPage } from './pages/ContactsPage';
 import { LandingPage } from './pages/LandingPage';
 import { SignInPage } from './pages/SignInPage';
 import { SignUpPage } from './pages/SignUpPage';
-import { getUser } from './lib/session';
-
-const ContactsPlaceholder = () => {
-  const user = getUser();
-  return (
-    <main className="page-shell">
-      <h1>Signed in</h1>
-      <p>Welcome, {user?.email ?? 'friend'}.</p>
-      <p>The contacts and chat experience lands in the next workstream.</p>
-    </main>
-  );
-};
 
 const App = () => {
   return (
@@ -27,7 +16,7 @@ const App = () => {
         path="/contacts"
         element={
           <RequireAuth>
-            <ContactsPlaceholder />
+            <ContactsPage />
           </RequireAuth>
         }
       />
