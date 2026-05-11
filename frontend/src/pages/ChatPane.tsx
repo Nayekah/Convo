@@ -17,7 +17,11 @@ import {
   type ChatKeys,
   type MessageEnvelope,
 } from '../lib/crypto-api';
-import { getUser, hasPrivateKey } from '../lib/session';
+import {
+  getUser,
+  hasPrivateKey,
+  rememberConversationContact,
+} from '../lib/session';
 import {
   CHAT_ALGORITHM,
   type ConversationInit,
@@ -121,6 +125,7 @@ export const ChatPane = () => {
         setLoadState({ status: 'awaiting-conversation' });
         return;
       }
+      rememberConversationContact(conversation.id, conversation.contact.id);
       if (!hasPrivateKey()) {
         setLoadState({ status: 'awaiting-key' });
         return;
@@ -179,6 +184,23 @@ export const ChatPane = () => {
         const display = await verifyAndDecrypt(event.message, keys, userId);
         setLoadState((current) => {
           if (current.status !== 'ready') return current;
+
+          // If this is the server's echo of a message we just sent, replace
+          // the optimistic temp bubble we added on send.
+          if (display.mine && display.status === 'ok') {
+            const tempIndex = current.messages.findIndex(
+              (m) =>
+                m.id.startsWith('temp-') &&
+                m.mine &&
+                m.sentAt === display.sentAt,
+            );
+            if (tempIndex >= 0) {
+              const updated = [...current.messages];
+              updated[tempIndex] = display;
+              return { ...current, messages: updated };
+            }
+          }
+
           if (current.messages.some((m) => m.id === display.id)) return current;
           return {
             ...current,
@@ -241,6 +263,18 @@ export const ChatPane = () => {
       mac,
       algorithm: CHAT_ALGORITHM,
       sentAt,
+    });
+
+    const tempMessage: DisplayMessage = {
+      id: `temp-${crypto.randomUUID()}`,
+      status: 'ok',
+      mine: true,
+      plaintext: text,
+      sentAt,
+    };
+    setLoadState((current) => {
+      if (current.status !== 'ready') return current;
+      return { ...current, messages: [...current.messages, tempMessage] };
     });
   };
 

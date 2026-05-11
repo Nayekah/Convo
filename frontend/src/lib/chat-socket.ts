@@ -51,11 +51,13 @@ export class ChatSocket {
     });
 
     ws.addEventListener('error', () => {
+      if (this.isClosed) return;
       this.handlers.onError?.('Socket error');
     });
 
     ws.addEventListener('close', () => {
       this.ws = null;
+      if (this.isClosed) return;
       this.handlers.onClose?.();
     });
   }

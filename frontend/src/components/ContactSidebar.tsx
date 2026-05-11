@@ -4,7 +4,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError } from '../lib/api';
 import { chatApi } from '../lib/chat-api';
-import { clearSession, getUser } from '../lib/session';
+import {
+  clearSession,
+  getContactForConversation,
+  getUser,
+  rememberConversationContact,
+} from '../lib/session';
 import type { Contact, ConversationInit } from '../types/chat';
 
 type LoadState =
@@ -17,6 +22,9 @@ export const ContactSidebar = () => {
   const { conversationId: activeConversationId } = useParams();
 
   const currentUser = getUser();
+  const activeContactId = activeConversationId
+    ? getContactForConversation(activeConversationId)
+    : null;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [openingContactId, setOpeningContactId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -55,6 +63,7 @@ export const ContactSidebar = () => {
     try {
       const response = await chatApi.createConversation(contact.id);
       const conversation: ConversationInit = response.conversation;
+      rememberConversationContact(conversation.id, contact.id);
       navigate(`/chat/${conversation.id}`, {
         state: { conversation },
       });
@@ -121,12 +130,19 @@ export const ContactSidebar = () => {
         <ul className="chat-sidebar__list">
           {state.contacts.map((contact) => {
             const isOpening = openingContactId === contact.id;
+            const isActive =
+              activeContactId !== null && activeContactId === contact.id;
+            const className = [
+              'contact-row',
+              isActive ? 'contact-row--active' : '',
+              isOpening ? 'contact-row--opening' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
             return (
               <li key={contact.id}>
                 <button
-                  className={`contact-row${
-                    isOpening ? ' contact-row--opening' : ''
-                  }`}
+                  className={className}
                   disabled={openingContactId !== null}
                   onClick={() => handleSelect(contact)}
                   type="button"
@@ -154,14 +170,6 @@ export const ContactSidebar = () => {
           {actionError}
         </div>
       ) : null}
-
-      {/*
-        activeConversationId is read just to keep React Router as the
-        source of truth for which conversation is open. Active highlight
-        will be added in slice 3d once we know how to map the conversation
-        back to its contact without an extra round trip.
-      */}
-      <span hidden>{activeConversationId}</span>
     </aside>
   );
 };

@@ -1309,6 +1309,15 @@ a {
   background: rgba(201, 179, 255, 0.1);
 }
 
+.contact-row--active {
+  border-color: var(--accent-primary);
+  background: rgba(201, 179, 255, 0.14);
+}
+
+.contact-row--active .contact-row__email {
+  color: var(--accent-primary-strong);
+}
+
 .contact-row__body {
   display: flex;
   flex-direction: column;

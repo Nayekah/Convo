@@ -1,5 +1,5 @@
 import { Send } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type MessageComposerProps = {
   disabled: boolean;
@@ -10,8 +10,15 @@ export const MessageComposer = ({ disabled, onSend }: MessageComposerProps) => {
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const isDisabled = disabled || isSending;
+
+  useEffect(() => {
+    if (!disabled) {
+      inputRef.current?.focus();
+    }
+  }, [disabled]);
 
   const handleSubmit = async (
     event: React.SyntheticEvent<HTMLFormElement>,
@@ -53,6 +60,7 @@ export const MessageComposer = ({ disabled, onSend }: MessageComposerProps) => {
           placeholder={
             disabled ? 'Connecting…' : 'Type a message and press Enter'
           }
+          ref={inputRef}
           type="text"
           value={text}
         />
