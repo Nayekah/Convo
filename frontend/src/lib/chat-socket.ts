@@ -71,9 +71,17 @@ export class ChatSocket {
 
   close(): void {
     this.isClosed = true;
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+    const ws = this.ws;
+    this.ws = null;
+    if (!ws) return;
+    // Calling close() while the socket is still CONNECTING produces a
+    // "closed before the connection is established" warning in DevTools.
+    // Defer the close until the handshake settles.
+    if (ws.readyState === WebSocket.CONNECTING) {
+      ws.addEventListener('open', () => ws.close(), { once: true });
+      ws.addEventListener('error', () => {}, { once: true });
+      return;
     }
+    ws.close();
   }
 }

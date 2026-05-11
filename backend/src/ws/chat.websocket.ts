@@ -1,9 +1,6 @@
-import { createHash } from 'node:crypto';
-import type { IncomingMessage } from 'node:http';
-import type { Duplex } from 'node:stream';
-
+import type { Context } from 'hono';
+import type { WSContext } from 'hono/ws';
 import { z } from 'zod';
-import type { ServerType } from '@hono/node-server';
 
 import { env } from '../configs/env.config';
 import { verify } from '../lib/jwt';
@@ -13,11 +10,10 @@ import {
 } from '../repositories/chat.repository';
 import type { AuthTokenPayload } from '../types/auth.type';
 
-const WEBSOCKET_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const CHAT_ALGORITHM = 'ECDH-P256+HKDF-SHA256+AES-256-GCM+HMAC-SHA256';
 const ACCESS_TOKEN_COOKIE = '__Host-convo_access_token';
 
-const activeConnections = new Map<string, Set<Duplex>>();
+const activeConnections = new Map<string, Set<WSContext>>();
 
 const sendMessageSchema = z.object({
   type: z.literal('message:send'),
@@ -32,7 +28,7 @@ const sendMessageSchema = z.object({
   }),
 });
 
-const parseCookies = (cookieHeader: string | undefined) => {
+const parseCookies = (cookieHeader: string | null) => {
   const cookies = new Map<string, string>();
 
   for (const cookie of cookieHeader?.split(';') ?? []) {
@@ -53,8 +49,8 @@ const parseCookies = (cookieHeader: string | undefined) => {
   return cookies;
 };
 
-const getAccessToken = (request: IncomingMessage, url: URL) => {
-  const cookieToken = parseCookies(request.headers.cookie).get(
+const getAccessToken = (c: Context): string | null => {
+  const cookieToken = parseCookies(c.req.raw.headers.get('cookie')).get(
     ACCESS_TOKEN_COOKIE,
   );
 
@@ -62,21 +58,22 @@ const getAccessToken = (request: IncomingMessage, url: URL) => {
     return cookieToken;
   }
 
-  const authHeader = request.headers.authorization;
+  const authHeader = c.req.raw.headers.get('authorization');
 
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.slice(7);
   }
 
-  const protocols = request.headers['sec-websocket-protocol']
+  const protocols = c.req.raw.headers
+    .get('sec-websocket-protocol')
     ?.split(',')
     .map((protocol) => protocol.trim());
 
-  if (protocols?.[0].toLowerCase() === 'bearer' && protocols[1]) {
+  if (protocols && protocols[0]?.toLowerCase() === 'bearer' && protocols[1]) {
     return protocols[1];
   }
 
-  const token = url.searchParams.get('token');
+  const token = c.req.query('token');
 
   if (token) {
     return token;
@@ -85,106 +82,52 @@ const getAccessToken = (request: IncomingMessage, url: URL) => {
   return null;
 };
 
-const authenticateRequest = (request: IncomingMessage, url: URL) => {
-  const token = getAccessToken(request, url);
+export const authenticateChatRequest = (c: Context): AuthTokenPayload | null => {
+  const token = getAccessToken(c);
 
   if (!token) {
-    throw new Error('Unauthorized');
+    return null;
   }
 
-  const decoded = verify(token, env.JWT_PUBLIC_KEY, {
-    algs: ['ES256'],
-    iss: env.JWT_ISSUER,
-    aud: env.JWT_AUDIENCE,
-  });
+  try {
+    const decoded = verify(token, env.JWT_PUBLIC_KEY, {
+      algs: ['ES256'],
+      iss: env.JWT_ISSUER,
+      aud: env.JWT_AUDIENCE,
+    });
 
-  return decoded.payload as AuthTokenPayload;
-};
-
-const rejectUpgrade = (socket: Duplex, statusCode: 400 | 401) => {
-  const reason = statusCode === 401 ? 'Unauthorized' : 'Bad Request';
-  socket.write(
-    `HTTP/1.1 ${statusCode} ${reason}\r\nConnection: close\r\n\r\n`,
-  );
-  socket.destroy();
-};
-
-const acceptUpgrade = (socket: Duplex, key: string, protocol?: string) => {
-  const acceptKey = createHash('sha1')
-    .update(`${key}${WEBSOCKET_GUID}`)
-    .digest('base64');
-
-  const headers = [
-    'HTTP/1.1 101 Switching Protocols',
-    'Upgrade: websocket',
-    'Connection: Upgrade',
-    `Sec-WebSocket-Accept: ${acceptKey}`,
-  ];
-
-  if (protocol) {
-    headers.push(`Sec-WebSocket-Protocol: ${protocol}`);
+    return decoded.payload as AuthTokenPayload;
+  } catch {
+    return null;
   }
-
-  socket.write([...headers, '', ''].join('\r\n'));
 };
 
-const trackConnection = (userId: string, socket: Duplex) => {
-  const existing = activeConnections.get(userId) ?? new Set<Duplex>();
-  existing.add(socket);
+const trackConnection = (userId: string, ws: WSContext) => {
+  const existing = activeConnections.get(userId) ?? new Set<WSContext>();
+  existing.add(ws);
   activeConnections.set(userId, existing);
-
-  const cleanup = () => {
-    existing.delete(socket);
-
-    if (existing.size === 0) {
-      activeConnections.delete(userId);
-    }
-  };
-
-  socket.once('close', cleanup);
-  socket.once('error', cleanup);
 };
 
-const encodeFrame = (payload: string, opcode = 0x1) => {
-  const payloadBuffer = Buffer.from(payload, 'utf8');
-  const header: number[] = [0x80 | opcode];
+const untrackConnection = (userId: string, ws: WSContext) => {
+  const existing = activeConnections.get(userId);
 
-  if (payloadBuffer.length < 126) {
-    header.push(payloadBuffer.length);
-  } else if (payloadBuffer.length <= 0xffff) {
-    header.push(
-      126,
-      (payloadBuffer.length >> 8) & 0xff,
-      payloadBuffer.length & 0xff,
-    );
-  } else {
-    const length = BigInt(payloadBuffer.length);
-    header.push(
-      127,
-      Number((length >> 56n) & 0xffn),
-      Number((length >> 48n) & 0xffn),
-      Number((length >> 40n) & 0xffn),
-      Number((length >> 32n) & 0xffn),
-      Number((length >> 24n) & 0xffn),
-      Number((length >> 16n) & 0xffn),
-      Number((length >> 8n) & 0xffn),
-      Number(length & 0xffn),
-    );
+  if (!existing) {
+    return;
   }
 
-  return Buffer.concat([Buffer.from(header), payloadBuffer]);
-};
+  existing.delete(ws);
 
-const sendJson = (socket: Duplex, payload: unknown) => {
-  if (!socket.destroyed) {
-    socket.write(encodeFrame(JSON.stringify(payload)));
+  if (existing.size === 0) {
+    activeConnections.delete(userId);
   }
 };
 
-const sendClose = (socket: Duplex, code = 1000) => {
-  const payload = Buffer.allocUnsafe(2);
-  payload.writeUInt16BE(code, 0);
-  socket.end(Buffer.concat([Buffer.from([0x88, payload.length]), payload]));
+const sendJson = (ws: WSContext, payload: unknown) => {
+  try {
+    ws.send(JSON.stringify(payload));
+  } catch {
+    // socket has already closed; ignore
+  }
 };
 
 const broadcastJson = (userIds: string[], payload: unknown) => {
@@ -195,8 +138,8 @@ const broadcastJson = (userIds: string[], payload: unknown) => {
       continue;
     }
 
-    for (const socket of sockets) {
-      sendJson(socket, payload);
+    for (const ws of sockets) {
+      sendJson(ws, payload);
     }
   }
 };
@@ -224,7 +167,7 @@ const sanitizeMessage = (message: {
 });
 
 const handleClientMessage = async (
-  socket: Duplex,
+  ws: WSContext,
   auth: AuthTokenPayload,
   raw: string,
 ) => {
@@ -233,14 +176,14 @@ const handleClientMessage = async (
   try {
     parsedJson = JSON.parse(raw);
   } catch {
-    sendJson(socket, { type: 'error', error: 'Invalid JSON message' });
+    sendJson(ws, { type: 'error', error: 'Invalid JSON message' });
     return;
   }
 
   const parsed = sendMessageSchema.safeParse(parsedJson);
 
   if (!parsed.success) {
-    sendJson(socket, {
+    sendJson(ws, {
       type: 'error',
       error: parsed.error.issues[0]?.message ?? 'Invalid message',
     });
@@ -250,7 +193,7 @@ const handleClientMessage = async (
   const event = parsed.data;
 
   if (event.receiverId === auth.sub) {
-    sendJson(socket, {
+    sendJson(ws, {
       type: 'error',
       error: 'Receiver must be another user',
     });
@@ -264,7 +207,7 @@ const handleClientMessage = async (
   });
 
   if (!conversation) {
-    sendJson(socket, { type: 'error', error: 'Conversation not found' });
+    sendJson(ws, { type: 'error', error: 'Conversation not found' });
     return;
   }
 
@@ -285,155 +228,31 @@ const handleClientMessage = async (
   });
 };
 
-const parseFrames = (buffer: Buffer<ArrayBufferLike>) => {
-  const frames: Array<{
-    opcode: number;
-    payload: Buffer<ArrayBufferLike>;
-  }> = [];
-  let offset = 0;
+export const buildChatWebSocketHandlers = (auth: AuthTokenPayload) => ({
+  onOpen: (_event: Event, ws: WSContext) => {
+    trackConnection(auth.sub, ws);
+    sendJson(ws, { type: 'connection:ready' });
+  },
+  onMessage: (event: MessageEvent, ws: WSContext) => {
+    const data = event.data;
+    const raw =
+      typeof data === 'string'
+        ? data
+        : data instanceof ArrayBuffer
+          ? new TextDecoder().decode(data)
+          : '';
 
-  while (offset + 2 <= buffer.length) {
-    const firstByte = buffer[offset];
-    const secondByte = buffer[offset + 1];
-    const opcode = firstByte & 0x0f;
-    const isMasked = (secondByte & 0x80) === 0x80;
-    let payloadLength = secondByte & 0x7f;
-    let headerLength = 2;
-
-    if (payloadLength === 126) {
-      if (offset + 4 > buffer.length) {
-        break;
-      }
-
-      payloadLength = buffer.readUInt16BE(offset + 2);
-      headerLength = 4;
-    } else if (payloadLength === 127) {
-      if (offset + 10 > buffer.length) {
-        break;
-      }
-
-      const extendedLength = buffer.readBigUInt64BE(offset + 2);
-
-      if (extendedLength > BigInt(Number.MAX_SAFE_INTEGER)) {
-        throw new Error('WebSocket message is too large');
-      }
-
-      payloadLength = Number(extendedLength);
-      headerLength = 10;
-    }
-
-    const maskLength = isMasked ? 4 : 0;
-    const frameLength = headerLength + maskLength + payloadLength;
-
-    if (offset + frameLength > buffer.length) {
-      break;
-    }
-
-    const maskStart = offset + headerLength;
-    const payloadStart = maskStart + maskLength;
-    const payload = Buffer.from(
-      buffer.subarray(payloadStart, payloadStart + payloadLength),
-    );
-
-    if (isMasked) {
-      const mask = buffer.subarray(maskStart, maskStart + 4);
-
-      for (let index = 0; index < payload.length; index += 1) {
-        payload[index] ^= mask[index % 4];
-      }
-    }
-
-    frames.push({ opcode, payload });
-    offset += frameLength;
-  }
-
-  return {
-    frames,
-    remaining: buffer.subarray(offset),
-  };
-};
-
-export const attachChatWebSocket = (server: ServerType) => {
-  server.on('upgrade', (request, socket) => {
-    const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
-
-    if (url.pathname !== '/api/ws') {
-      socket.destroy();
-      return;
-    }
-
-    const key = request.headers['sec-websocket-key'];
-
-    if (
-      request.headers.upgrade?.toLowerCase() !== 'websocket' ||
-      typeof key !== 'string'
-    ) {
-      rejectUpgrade(socket, 400);
-      return;
-    }
-
-    let auth: AuthTokenPayload;
-
-    try {
-      auth = authenticateRequest(request, url);
-    } catch {
-      rejectUpgrade(socket, 401);
-      return;
-    }
-
-    const protocols = request.headers['sec-websocket-protocol']
-      ?.split(',')
-      .map((protocol: string) => protocol.trim().toLowerCase());
-    const acceptedProtocol = protocols?.includes('bearer')
-      ? 'bearer'
-      : undefined;
-
-    acceptUpgrade(socket, key, acceptedProtocol);
-    trackConnection(auth.sub, socket);
-    sendJson(socket, { type: 'connection:ready' });
-
-    let buffered: Buffer<ArrayBufferLike> = Buffer.alloc(0);
-
-    socket.on('data', (chunk: Buffer<ArrayBufferLike>) => {
-      try {
-        buffered = Buffer.concat([buffered, chunk]);
-        const parsed = parseFrames(buffered);
-        buffered = parsed.remaining;
-
-        for (const frame of parsed.frames) {
-          if (frame.opcode === 0x8) {
-            sendClose(socket);
-            return;
-          }
-
-          if (frame.opcode === 0x9) {
-            socket.write(encodeFrame(frame.payload.toString('utf8'), 0xA));
-            continue;
-          }
-
-          if (frame.opcode !== 0x1) {
-            sendJson(socket, { type: 'error', error: 'Unsupported frame type' });
-            continue;
-          }
-
-          void handleClientMessage(
-            socket,
-            auth,
-            frame.payload.toString('utf8'),
-          ).catch((error: unknown) => {
-            sendJson(socket, {
-              type: 'error',
-              error:
-                error instanceof Error ? error.message : 'Message send failed',
-            });
-          });
-        }
-      } catch (error) {
-        sendJson(socket, {
-          type: 'error',
-          error: error instanceof Error ? error.message : 'WebSocket error',
-        });
-      }
+    void handleClientMessage(ws, auth, raw).catch((error: unknown) => {
+      sendJson(ws, {
+        type: 'error',
+        error: error instanceof Error ? error.message : 'Message send failed',
+      });
     });
-  });
-};
+  },
+  onClose: (_event: CloseEvent, ws: WSContext) => {
+    untrackConnection(auth.sub, ws);
+  },
+  onError: (_event: Event, ws: WSContext) => {
+    untrackConnection(auth.sub, ws);
+  },
+});
