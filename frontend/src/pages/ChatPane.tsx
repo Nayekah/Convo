@@ -1,20 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 
 import { type DisplayMessage } from '../components/MessageBubble';
+import { MessageComposer } from '../components/MessageComposer';
 import { MessageList } from '../components/MessageList';
 import { UnlockPrompt } from '../components/UnlockPrompt';
 import { ApiError } from '../lib/api';
 import { chatApi } from '../lib/chat-api';
 import { getOrDeriveChatKeys } from '../lib/chat-keys-cache';
+import { ChatSocket } from '../lib/chat-socket';
 import {
   decryptMessage,
+  encryptMessage,
+  signEnvelope,
   verifyEnvelopeMac,
   type ChatKeys,
   type MessageEnvelope,
 } from '../lib/crypto-api';
 import { getUser, hasPrivateKey } from '../lib/session';
-import type { ConversationInit, EncryptedMessage } from '../types/chat';
+import {
+  CHAT_ALGORITHM,
+  type ConversationInit,
+  type EncryptedMessage,
+} from '../types/chat';
 
 type LocationState = {
   conversation?: ConversationInit;
@@ -24,7 +32,11 @@ type LoadState =
   | { status: 'awaiting-conversation' }
   | { status: 'awaiting-key' }
   | { status: 'preparing' }
-  | { status: 'ready'; messages: DisplayMessage[] }
+  | {
+      status: 'ready';
+      messages: DisplayMessage[];
+      keys: ChatKeys;
+    }
   | { status: 'error'; message: string };
 
 const ENVELOPE_VERSION = '1';
@@ -97,7 +109,10 @@ export const ChatPane = () => {
     status: 'awaiting-conversation',
   });
   const [unlockNonce, setUnlockNonce] = useState(0);
+  const [socketReady, setSocketReady] = useState(false);
+  const socketRef = useRef<ChatSocket | null>(null);
 
+  // Effect 1: derive keys + fetch history
   useEffect(() => {
     let cancelled = false;
 
@@ -128,7 +143,7 @@ export const ChatPane = () => {
         );
 
         if (!cancelled) {
-          setLoadState({ status: 'ready', messages: display });
+          setLoadState({ status: 'ready', messages: display, keys: chatKeys });
         }
       } catch (error) {
         if (cancelled) return;
@@ -148,6 +163,86 @@ export const ChatPane = () => {
       cancelled = true;
     };
   }, [conversation, conversationId, userId, unlockNonce]);
+
+  // Effect 2: WebSocket lifecycle — connect once when conversation is ready,
+  // close on unmount or conversation change.
+  useEffect(() => {
+    if (!conversation || !userId || loadState.status !== 'ready') {
+      return;
+    }
+
+    const keys = loadState.keys;
+    const socket = new ChatSocket({
+      onReady: () => setSocketReady(true),
+      onStored: async (event) => {
+        if (event.message.conversationId !== conversation.id) return;
+        const display = await verifyAndDecrypt(event.message, keys, userId);
+        setLoadState((current) => {
+          if (current.status !== 'ready') return current;
+          if (current.messages.some((m) => m.id === display.id)) return current;
+          return {
+            ...current,
+            messages: [...current.messages, display],
+          };
+        });
+      },
+      onError: (msg) => {
+        console.warn('[chat-socket] error:', msg);
+      },
+      onClose: () => {
+        setSocketReady(false);
+      },
+    });
+
+    socket.connect();
+    socketRef.current = socket;
+
+    return () => {
+      socket.close();
+      socketRef.current = null;
+      setSocketReady(false);
+    };
+    // We deliberately only re-run when the conversation or user identity
+    // changes. Re-deriving chat keys via getOrDeriveChatKeys is cached, but
+    // the keys object inside loadState is the trigger we react to so we
+    // pull it fresh from loadState on each open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation?.id, userId, loadState.status === 'ready']);
+
+  const handleSend = async (text: string) => {
+    if (
+      loadState.status !== 'ready' ||
+      !conversation ||
+      !userId ||
+      !socketRef.current
+    ) {
+      throw new Error('Not ready to send.');
+    }
+
+    const { ciphertext, iv } = await encryptMessage(text, loadState.keys.aesKey);
+    const sentAt = new Date().toISOString();
+    const envelope: MessageEnvelope = {
+      version: ENVELOPE_VERSION,
+      conversationId: conversation.id,
+      senderId: userId,
+      receiverId: conversation.contact.id,
+      iv,
+      ciphertext,
+      sentAt,
+    };
+    const mac = await signEnvelope(envelope, loadState.keys.hmacKey);
+
+    socketRef.current.send({
+      type: 'message:send',
+      conversationId: conversation.id,
+      receiverId: conversation.contact.id,
+      ciphertext,
+      iv,
+      mac,
+      algorithm: CHAT_ALGORITHM,
+      sentAt,
+    });
+  };
 
   if (!conversationId) {
     return null;
@@ -201,6 +296,10 @@ export const ChatPane = () => {
           <MessageList messages={loadState.messages} />
         ) : null}
       </div>
+
+      {loadState.status === 'ready' ? (
+        <MessageComposer disabled={!socketReady} onSend={handleSend} />
+      ) : null}
     </div>
   );
 };
