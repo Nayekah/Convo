@@ -8,7 +8,7 @@
 
 `Convo` is a web-based secure messaging application. The project combines user authentication, client-side cryptographic key preparation, encrypted private-key storage, and a production-oriented container setup behind a reverse proxy.
 
-The current implementation includes the landing page, sign-up flow, sign-in flow, custom JWT authentication, encrypted ECDH private-key storage, PostgreSQL persistence, Docker orchestration, and JWT unit tests. Contact selection, chat key derivation, encrypted messaging, MAC verification, and WebSocket delivery are planned next.
+The current implementation includes the landing page, sign-up flow, sign-in flow, custom JWT authentication with an HttpOnly cookie, encrypted ECDH private-key storage, PostgreSQL persistence, backend contact/conversation APIs, encrypted message persistence, backend WebSocket delivery, Docker orchestration, and JWT unit tests. Frontend chat key derivation, encrypted messaging UI, MAC verification, and WebSocket integration are planned next.
 
 ## Tech Stack and Languages
 
@@ -72,9 +72,9 @@ The current implementation includes the landing page, sign-up flow, sign-in flow
 
 `Convo` is designed around a server-assisted but privacy-oriented messaging model. The server authenticates users and stores encrypted key material, while cryptographic operations for communication are designed to happen on the client side. During registration, the frontend generates an ECDH key pair with the Web Crypto API. The private key is encrypted before being sent to the backend, and the backend stores only the encrypted private key, public key, and recovery metadata.
 
-Authentication uses a custom JWT library implemented in the backend. Tokens are encoded as JWS compact serialization and signed with ECDSA. The JWT library supports ES256, ES384, and ES512 for assignment compliance, while application login tokens use ES256 only. The client sends JWTs as `Authorization: Bearer <token>`. Cookie storage is allowed by the assignment, but not required.
+Authentication uses a custom JWT library implemented in the backend. Tokens are encoded as JWS compact serialization and signed with ECDSA. The JWT library supports ES256, ES384, and ES512 for assignment compliance, while application login tokens use ES256 only. Browser authentication uses a `__Host-convo_access_token` HttpOnly cookie set with `hono/cookie`; backend middleware reads that cookie first and keeps `Authorization: Bearer <token>` as a compatibility fallback for non-browser tools.
 
-Password verification uses scrypt with a unique per-user salt. Private ECDH key protection uses PBKDF2-SHA-256 in the browser to derive an AES-256-GCM wrapping key from the user's password. Planned chat encryption uses ECDH P-256, HKDF-SHA-256 for chat key separation, AES-256-GCM for message encryption, and HMAC-SHA-256 for the MAC bonus.
+Password verification uses scrypt with a unique per-user salt. Private ECDH key protection uses PBKDF2-SHA-256 in the browser to derive an AES-256-GCM wrapping key from the user's password. Planned chat encryption uses ECDH P-256, HKDF-SHA-256 for chat key separation, AES-256-GCM for message encryption, and HMAC-SHA-256 for MAC.
 
 ---
 
@@ -86,9 +86,13 @@ Password verification uses scrypt with a unique per-user salt. Private ECDH key 
 - Salted scrypt password hashing
 - Custom JWT sign and verify library
 - ES256, ES384, and ES512 support
+- HttpOnly JWT access cookie with `hono/cookie`
 - JWT unit tests with Node.js `node:test`
 - Client-side ECDH key generation
 - Client-side private-key encryption before upload with PBKDF2-SHA-256 and AES-256-GCM
+- Contact list and one-to-one conversation REST APIs
+- Encrypted message history API
+- Backend WebSocket endpoint for encrypted message persistence and broadcast
 - PostgreSQL persistence through Prisma
 - Docker Compose full-stack setup
 - Caddy reverse proxy with HTTPS
@@ -304,13 +308,14 @@ bun run test:jwt
 - Frontend encrypts the exported private key using AES-256-GCM.
 - Backend stores the public key, encrypted private key, password hash, salts, and metadata.
 - Backend issues a signed JWT access token in an `HttpOnly` cookie.
-- Backend hashes the password with scrypt and returns a signed ES256 JWT access token.
+- Backend hashes the password with scrypt and returns sanitized user data; the JWT itself stays in the cookie rather than the JSON body.
 
 ### Login
 
 - User submits email and password.
 - Backend verifies the salted scrypt password hash.
 - Backend issues a signed JWT access token in an `HttpOnly` cookie.
+- Backend returns sanitized user data and encrypted private-key metadata for local private-key decryption.
 
 ### Protected API Access
 
@@ -318,15 +323,22 @@ bun run test:jwt
 - Backend verifies the JWT signature and registered claims.
 - Backend accepts ES256 application tokens only.
 - Protected route handlers receive the decoded authentication payload.
+- Non-browser tools may use `Authorization: Bearer <token>` as a compatibility fallback.
 
-### Planned Secure Messaging
+### Backend Secure Messaging
+
+- The backend exposes contacts, conversation creation/lookup, and encrypted message history APIs.
+- The backend WebSocket endpoint stores and broadcasts encrypted message envelopes.
+- The server stores ciphertext, IV, MAC, algorithm, sender, receiver, conversation ID, and sent timestamp.
+- The server never decrypts messages and does not hold plaintext message keys.
+
+### Planned Frontend Secure Messaging
 
 - Each chat pair derives a shared secret with ECDH.
 - The shared secret is processed with HKDF.
 - HKDF separates the shared secret into an AES-256-GCM message key and an HMAC-SHA-256 MAC key.
 - AES-256-GCM is used for message encryption and decryption.
 - HMAC-SHA-256 is verified before decryption for the MAC bonus.
-- The server forwards encrypted payloads without holding plaintext message keys.
 
 ---
 
@@ -334,7 +346,8 @@ bun run test:jwt
 
 - Do not commit `.env`.
 - Do not commit real JWT private keys.
-- Store JWTs in `HttpOnly` cookies instead of browser-readable storage.
+- Store browser JWTs only in the `__Host-convo_access_token` HttpOnly cookie instead of browser-readable storage.
+- Use credentialed frontend requests so the browser sends the auth cookie.
 - Generate fresh keys for every deployment.
 - Keep backend and PostgreSQL on the internal Docker network for public deployments.
 - Use HTTPS in front of the reverse proxy when deployed to the internet.

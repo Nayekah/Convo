@@ -5,7 +5,8 @@
 This plan is based on the current codebase.
 
 - Password hashing stays **scrypt + per-user salt**. The spec allows any password hashing algorithm.
-- JWT transport stays **`Authorization: Bearer <token>`**. Cookie handling is allowed by the spec, but not required.
+- Browser JWT transport uses a **`__Host-convo_access_token` HttpOnly cookie** set with `hono/cookie`.
+- Backend auth middleware reads the HttpOnly cookie first and keeps `Authorization: Bearer <token>` as a compatibility fallback for non-browser tools.
 - The JWT library keeps **ES256, ES384, and ES512** support because the spec table requires those algorithms. The application itself only issues and accepts **ES256** tokens.
 - JWT unit tests stay on **Node.js `node:test`**. The JWT bonus allows any unit test framework.
 - Client crypto must use **Web Crypto API** for ECDH, HKDF, AES, and HMAC-related operations.
@@ -29,25 +30,31 @@ This plan is based on the current codebase.
 - Server-side scrypt password hashing with unique salt.
 - Custom JWT library with `sign` and `verify`.
 - JWT tests with `node:test`; current suite passes.
+- Contact list REST API excluding the current user.
+- One-to-one conversation creation/lookup REST API with stable ordered participants.
+- Encrypted message history REST API with participant authorization.
+- Prisma `Conversation` and `Message` schema plus migration.
+- Backend WebSocket endpoint at `/api/ws`.
+- WebSocket authentication with the same ES256 JWT verifier.
+- REST auth uses `hono/cookie` to set and read an HttpOnly `__Host-convo_access_token` cookie.
+- Active WebSocket connection tracking by user ID.
+- Encrypted WebSocket message persistence and broadcast to sender/receiver.
 - Docker Compose, backend Dockerfile, frontend Dockerfile, and Nginx reverse proxy.
 
 ### Needs Revision
 
-- Update README to describe scrypt, Bearer JWT auth, PBKDF2 private-key wrapping, and HKDF chat-key derivation accurately.
 - Add deployment-oriented env notes and VPS run commands.
 
 ### Not Implemented
 
-- Contact list excluding the current user.
-- Conversation creation/lookup.
-- Encrypted message schema and persistence.
 - Private ECDH key decryption after login.
 - ECDH shared-secret derivation for chat.
 - HKDF key separation for AES/HMAC chat keys.
 - AES-256-GCM message encryption/decryption.
 - HMAC-SHA-256 Encrypt-then-MAC bonus.
-- WebSocket real-time chat.
+- Frontend WebSocket real-time chat integration.
 - Invalid-MAC and decrypt-failed UI states.
+- Automated tests for auth routes, chat REST APIs, WebSocket message flow, and frontend crypto helpers.
 - Full required report and video demo evidence.
 
 ## 3. Tech Stack and Crypto Flow
@@ -70,14 +77,14 @@ This plan is based on the current codebase.
 5. Browser encrypts the exported private key with AES-256-GCM.
 6. Browser sends email, password, public key, encrypted private key, IV, salt, iteration count, and algorithm metadata to the server.
 7. Server hashes the password with scrypt and stores only the hash, salt, public key, encrypted private key, and metadata.
-8. Server signs an ES256 JWT and returns it.
+8. Server signs an ES256 JWT, sets it in the HttpOnly auth cookie, and returns the sanitized user data.
 
 ### Login Flow
 
 1. User enters email and password.
 2. Server verifies the password with scrypt.
-3. Server returns an ES256 JWT and the encrypted private-key metadata.
-4. Browser stores the JWT for Bearer auth.
+3. Server sets an ES256 JWT in an HttpOnly `__Host-convo_access_token` cookie and returns the encrypted private-key metadata.
+4. Browser sends the cookie automatically on credentialed API requests.
 5. Browser keeps the password only long enough to decrypt the private ECDH key locally.
 
 ### Chat Key Flow
@@ -107,24 +114,26 @@ This plan is based on the current codebase.
 
 ### Step 2: Add Backend REST APIs
 
-- Add `GET /api/contacts`.
-  - Auth required.
-  - Return all users except current user.
-  - Return only `id`, `email`, and `publicKey`.
+Status: **Done**.
 
-- Add `POST /api/conversations`.
+- Added `GET /api/contacts`.
+  - Auth required.
+  - Returns all users except current user.
+  - Returns only `id`, `email`, and `publicKey`.
+
+- Added `POST /api/conversations`.
   - Auth required.
   - Body: `{ contactId: string }`.
-  - Validate contact exists and is not current user.
-  - Get or create ordered one-to-one conversation.
-  - Return conversation ID, contact info, contact public key, and `hkdfSalt`.
+  - Validates contact exists and is not current user.
+  - Gets or creates ordered one-to-one conversation.
+  - Returns conversation ID, contact info, contact public key, and `hkdfSalt`.
 
-- Add `GET /api/conversations/:conversationId/messages`.
+- Added `GET /api/conversations/:conversationId/messages`.
   - Auth required.
-  - Validate current user belongs to the conversation.
-  - Return encrypted message envelopes only.
+  - Validates current user belongs to the conversation.
+  - Returns encrypted message envelopes only.
 
-- Keep auth middleware accepting only ES256 app tokens:
+- Auth middleware reads the HttpOnly cookie first and accepts only ES256 app tokens:
 
 ```ts
 algs: ['ES256']
@@ -132,10 +141,16 @@ algs: ['ES256']
 
 ### Step 3: Add Backend WebSocket Chat
 
-- Add a WebSocket endpoint at `/api/ws`.
-- Authenticate the WebSocket connection using the same Bearer JWT.
-- Track active connections by user ID.
-- Accept client event:
+Status: **Done**.
+
+- Added a WebSocket endpoint at `/api/ws`.
+- Authenticates the WebSocket connection using the same ES256 JWT verifier.
+  - Supports the `__Host-convo_access_token` cookie for browser clients.
+  - Supports `Authorization: Bearer <token>` for non-browser clients.
+  - Supports a `bearer` WebSocket subprotocol plus token value as a compatibility fallback.
+  - Supports `?token=<jwt>` as a local/debug fallback, not as the preferred browser flow.
+- Tracks active connections by user ID.
+- Accepts client event:
 
 ```json
 {
@@ -158,8 +173,8 @@ algs: ['ES256']
 ### Step 4: Add Frontend Auth State
 
 - Add a small auth/session module.
-- Store JWT and authenticated user.
-- Provide a helper for authorized REST calls.
+- Store authenticated user state client-side; keep the JWT in the HttpOnly cookie.
+- Provide a helper for credentialed REST calls.
 - Redirect unauthenticated users from contacts/chat pages to sign-in.
 - Keep decrypted private key only in memory after login/sign-up. If the page reloads, ask the user to sign in again or re-enter the password before decrypting messages.
 
@@ -329,7 +344,7 @@ Use these for the report and video:
 
 - Updated backend and frontend implementation.
 - Updated Prisma schema and migration.
-- Updated `docker-compose.yml`; remove the need for `docker-compose.local-dev.yml`.
+- Updated `docker-compose.yml`.
 - Updated README with local development, full Docker, and VPS notes.
 - JWT unit tests passing.
 - Report PDF containing:

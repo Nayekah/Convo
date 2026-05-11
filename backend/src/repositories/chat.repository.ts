@@ -75,6 +75,26 @@ export const findConversationForUser = async ({
   });
 };
 
+export const findConversationForParticipants = async ({
+  conversationId,
+  userId,
+  receiverId,
+}: {
+  conversationId: string;
+  userId: string;
+  receiverId: string;
+}) => {
+  return prisma.conversation.findFirst({
+    where: {
+      id: conversationId,
+      OR: [
+        { userAId: userId, userBId: receiverId },
+        { userAId: receiverId, userBId: userId },
+      ],
+    },
+  });
+};
+
 export const findConversationMessages = async (conversationId: string) => {
   return prisma.message.findMany({
     where: {
@@ -82,6 +102,50 @@ export const findConversationMessages = async (conversationId: string) => {
     },
     orderBy: {
       sentAt: 'asc',
+    },
+    select: {
+      id: true,
+      conversationId: true,
+      senderId: true,
+      receiverId: true,
+      ciphertext: true,
+      iv: true,
+      mac: true,
+      algorithm: true,
+      sentAt: true,
+    },
+  });
+};
+
+export const createEncryptedMessage = async ({
+  conversationId,
+  senderId,
+  receiverId,
+  ciphertext,
+  iv,
+  mac,
+  algorithm,
+  sentAt,
+}: {
+  conversationId: string;
+  senderId: string;
+  receiverId: string;
+  ciphertext: string;
+  iv: string;
+  mac: string;
+  algorithm: string;
+  sentAt: Date;
+}) => {
+  return prisma.message.create({
+    data: {
+      conversationId,
+      senderId,
+      receiverId,
+      ciphertext,
+      iv,
+      mac,
+      algorithm,
+      sentAt,
     },
     select: {
       id: true,
