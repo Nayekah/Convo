@@ -77,16 +77,11 @@ export const ContactSidebar = () => {
   return (
     <aside className="chat-sidebar">
       <div className="chat-sidebar__profile">
-        <div className="chat-sidebar__profile-info">
-          <span aria-hidden="true" className="chat-sidebar__avatar">
-            {currentUser?.email.slice(0, 1).toUpperCase() ?? '?'}
+        <div className="chat-sidebar__profile-text">
+          <span className="chat-sidebar__profile-label">Signed in as</span>
+          <span className="chat-sidebar__profile-email" title={currentUser?.email}>
+            {currentUser?.email ?? 'Unknown'}
           </span>
-          <div className="chat-sidebar__profile-text">
-            <span className="chat-sidebar__profile-label">Signed in as</span>
-            <span className="chat-sidebar__profile-email" title={currentUser?.email}>
-              {currentUser?.email ?? 'Unknown'}
-            </span>
-          </div>
         </div>
         <button
           aria-label="Sign out"
@@ -136,9 +131,6 @@ export const ContactSidebar = () => {
                   onClick={() => handleSelect(contact)}
                   type="button"
                 >
-                  <span aria-hidden="true" className="contact-row__avatar">
-                    {contact.email.slice(0, 1).toUpperCase()}
-                  </span>
                   <span className="contact-row__body">
                     <span className="contact-row__email">{contact.email}</span>
                     {isOpening ? (

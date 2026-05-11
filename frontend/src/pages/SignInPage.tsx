@@ -11,7 +11,11 @@ import {
   importPrivateEcdhKey,
 } from '../lib/crypto-api';
 import { usePageMeta } from '../lib/page-meta';
-import { setPrivateKey, setUser } from '../lib/session';
+import {
+  setEncryptedPrivateKeyMetadata,
+  setPrivateKey,
+  setUser,
+} from '../lib/session';
 
 export const SignInPage = () => {
   usePageMeta({
@@ -43,6 +47,12 @@ export const SignInPage = () => {
         email: response.user.email,
         publicKey: response.user.publicKey,
         createdAt: response.user.createdAt,
+      });
+      setEncryptedPrivateKeyMetadata({
+        encryptedPrivateKey: response.user.encryptedPrivateKey,
+        privateKeyIv: response.user.privateKeyIv,
+        privateKeySalt: response.user.privateKeySalt,
+        privateKeyKdfIterations: response.user.privateKeyKdfIterations,
       });
       setPrivateKey(privateKey);
 
