@@ -82,24 +82,20 @@ const getAccessToken = (c: Context): string | null => {
   return null;
 };
 
-export const authenticateChatRequest = (c: Context): AuthTokenPayload | null => {
+export const authenticateRequest = (c: Context) => {
   const token = getAccessToken(c);
 
   if (!token) {
-    return null;
+    throw new Error('Unauthorized');
   }
 
-  try {
-    const decoded = verify(token, env.JWT_PUBLIC_KEY, {
-      algs: ['ES256'],
-      iss: env.JWT_ISSUER,
-      aud: env.JWT_AUDIENCE,
-    });
+  const decoded = verify(token, env.JWT_PUBLIC_KEY, {
+    algs: ['ES256'],
+    iss: env.JWT_ISSUER,
+    aud: env.JWT_AUDIENCE,
+  });
 
-    return decoded.payload as AuthTokenPayload;
-  } catch {
-    return null;
-  }
+  return decoded.payload as AuthTokenPayload;
 };
 
 const trackConnection = (userId: string, ws: WSContext) => {

@@ -6,7 +6,7 @@ import { env } from './configs/env.config';
 import { apiRouter } from './controllers/api.controller';
 import type { AuthTokenPayload } from './types/auth.type';
 import {
-  authenticateChatRequest,
+  authenticateRequest,
   buildChatWebSocketHandlers,
 } from './ws/chat.websocket';
 
@@ -49,19 +49,15 @@ app.get('/', (c) => c.json({ message: 'Convo backend is running' }));
 app.get(
   '/api/ws',
   async (c, next) => {
-    const auth = authenticateChatRequest(c);
-
-    if (!auth) {
+    try {
+      c.set('chatAuth', authenticateRequest(c));
+    } catch {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    c.set('chatAuth', auth);
     await next();
   },
-  upgradeWebSocket((c) => {
-    const auth = c.get('chatAuth');
-    return buildChatWebSocketHandlers(auth);
-  }),
+  upgradeWebSocket((c) => buildChatWebSocketHandlers(c.get('chatAuth'))),
 );
 
 app.route('/api', apiRouter);
