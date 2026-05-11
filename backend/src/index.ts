@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 
 import { env } from './configs/env.config';
 import { apiRouter } from './controllers/api.controller';
+import { attachChatWebSocket } from './ws/chat.websocket';
 
 const app = new OpenAPIHono();
 
@@ -37,7 +38,7 @@ app.get('/', (c) => c.json({ message: 'Convo backend is running' }));
 
 app.route('/api', apiRouter);
 
-serve(
+const server = serve(
   {
     fetch: app.fetch,
     port: env.PORT,
@@ -46,3 +47,5 @@ serve(
     console.log(`Server listening on http://localhost:${info.port}`);
   },
 );
+
+attachChatWebSocket(server);
