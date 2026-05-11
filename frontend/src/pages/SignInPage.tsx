@@ -46,7 +46,7 @@ export const SignInPage = () => {
       });
       setPrivateKey(privateKey);
 
-      navigate('/contacts');
+      navigate('/chat');
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.status < 500) {
         setError('Invalid email or password');

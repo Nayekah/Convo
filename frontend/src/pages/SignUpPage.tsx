@@ -59,7 +59,7 @@ export const SignUpPage = () => {
       });
       setPrivateKey(privateKey);
 
-      navigate('/contacts');
+      navigate('/chat');
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.status < 500) {
         setError('Unable to create account');
