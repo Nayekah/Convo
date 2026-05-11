@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client';
+import type { Context } from 'hono';
+import { setCookie } from 'hono/cookie';
 
 import { env } from '../configs/env.config';
 import { sign } from '../lib/jwt';
@@ -11,6 +13,8 @@ import { generateSalt, hashPassword, verifyPassword } from '../utils/password';
 import { createRouter } from '../utils/router-factory';
 
 export const authRouter = createRouter();
+
+const ACCESS_TOKEN_COOKIE = '__Host-convo_access_token';
 
 const createAccessToken = (payload: { userId: string; email: string }) => {
   const now = Math.floor(Date.now() / 1000);
@@ -32,6 +36,16 @@ const createAccessToken = (payload: { userId: string; email: string }) => {
       email: payload.email,
     },
     privateKey: env.JWT_PRIVATE_KEY,
+  });
+};
+
+const setAccessTokenCookie = (c: Context, token: string) => {
+  setCookie(c, ACCESS_TOKEN_COOKIE, token, {
+    httpOnly: true,
+    maxAge: env.JWT_ACCESS_TOKEN_TTL_SECONDS,
+    path: '/',
+    sameSite: 'Lax',
+    secure: true,
   });
 };
 
@@ -105,9 +119,10 @@ authRouter.openapi(signupRoute, async (c) => {
       email: createdUser.email,
     });
 
+    setAccessTokenCookie(c, token);
+
     return c.json(
       {
-        token,
         user: sanitizeUser(createdUser),
       },
       201,
@@ -164,9 +179,10 @@ authRouter.openapi(signinRoute, async (c) => {
     email: user.email,
   });
 
+  setAccessTokenCookie(c, token);
+
   return c.json(
     {
-      token,
       user: sanitizeUser(user),
     },
     200,

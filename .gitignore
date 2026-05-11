@@ -8,4 +8,9 @@ dist
 coverage
 *.log
 *.tsbuildinfo
+
+# Key material
 *.pem
+*.key
+*.crt
+*.cert

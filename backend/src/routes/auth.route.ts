@@ -35,7 +35,6 @@ export const signupRoute = createRoute({
       content: {
         'application/json': {
           schema: z.object({
-            token: z.string(),
             user: authUserSchema,
           }),
         },
@@ -94,7 +93,6 @@ export const signinRoute = createRoute({
       content: {
         'application/json': {
           schema: z.object({
-            token: z.string(),
             user: authUserSchema,
           }),
         },

@@ -7,12 +7,28 @@ import { apiRouter } from './controllers/api.controller';
 
 const app = new OpenAPIHono();
 
+app.use('/api/*', async (c, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method)) {
+    await next();
+    return;
+  }
+
+  const origin = c.req.header('Origin');
+
+  if (origin !== env.FRONTEND_ORIGIN) {
+    return c.json({ error: 'Forbidden' }, 403);
+  }
+
+  await next();
+});
+
 app.use(
   '/api/*',
   cors({
     origin: env.FRONTEND_ORIGIN,
     allowMethods: ['GET', 'POST', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
     maxAge: 86400,
   }),
 );

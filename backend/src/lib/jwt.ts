@@ -1,4 +1,4 @@
-import { createSign, createVerify } from 'node:crypto';
+import { sign as cryptoSign, verify as cryptoVerify } from 'node:crypto';
 
 import {
   decodeBase64Url,
@@ -202,13 +202,14 @@ export const sign = ({
   const encodedPayload = encodeJsonBase64Url(mergedPayload);
 
   const signingInput = `${encodedHeader}.${encodedPayload}`;
-  const signature = createSign(ALGORITHM_MAP[header.alg].hash)
-    .update(signingInput)
-    .end()
-    .sign({
+  const signature = cryptoSign(
+    ALGORITHM_MAP[header.alg].hash,
+    Buffer.from(signingInput),
+    {
       key: privateKey,
       dsaEncoding: 'ieee-p1363',
-    });
+    },
+  );
 
   if (signature.byteLength !== ALGORITHM_MAP[header.alg].signatureLength) {
     throw new Error('Invalid ECDSA signature length');
@@ -296,16 +297,15 @@ export const verify = (
 
   const signedPart = `${encodedHeader}.${encodedPayload}`;
 
-  const isValidSignature = createVerify(ALGORITHM_MAP[header.alg].hash)
-    .update(signedPart)
-    .end()
-    .verify(
-      {
-        key: publicKey,
-        dsaEncoding: 'ieee-p1363',
-      },
-      signatureBytes,
-    );
+  const isValidSignature = cryptoVerify(
+    ALGORITHM_MAP[header.alg].hash,
+    Buffer.from(signedPart),
+    {
+      key: publicKey,
+      dsaEncoding: 'ieee-p1363',
+    },
+    signatureBytes,
+  );
 
   if (!isValidSignature) {
     throw new Error('Invalid JWT signature');

@@ -5,9 +5,9 @@ The Convo backend is a Hono, TypeScript, and Prisma service that handles authent
 ## Responsibilities
 
 - Register users with email, password hash, password salt, ECDH public key, encrypted ECDH private key, and key-recovery metadata.
-- Authenticate users with salted scrypt password verification.
-- Issue JWS JWT access tokens signed with ES256.
-- Verify Bearer access tokens for protected routes.
+- Authenticate users with salted password verification.
+- Issue JWS JWT access tokens signed with the custom ES256 JWT library in `HttpOnly` cookies.
+- Verify access tokens for protected routes.
 - Store user records in PostgreSQL through Prisma.
 - Planned: store encrypted message envelopes and relay them over WebSocket without plaintext access.
 
@@ -70,7 +70,7 @@ The backend runs at:
 http://localhost:9173
 ```
 
-The public application should call the backend through `/api/*` via the reverse proxy or Vite dev proxy.
+The public Docker application should call the backend through `/api/*` via the HTTPS reverse proxy at `https://localhost`.
 
 Local development uses the same root `docker-compose.yml` as the full stack. PostgreSQL is published to `127.0.0.1:5532` for the backend running outside Docker.
 
@@ -84,16 +84,7 @@ POST /api/auth/signin
 GET  /api/auth/me
 ```
 
-Planned chat routes:
-
-```text
-GET  /api/contacts
-POST /api/conversations
-GET  /api/conversations/:conversationId/messages
-WS   /api/ws
-```
-
-`GET /api/auth/me` requires:
+`GET /api/auth/me` requires the `__Host-convo_access_token` cookie. Bearer tokens are still accepted for development tooling:
 
 ```text
 Authorization: Bearer <access-token>
@@ -108,17 +99,17 @@ Sign-up:
 3. The frontend encrypts the ECDH private key with AES-256-GCM before submission.
 4. The backend hashes the password with scrypt and a unique salt.
 4. The backend stores the public key, encrypted private key, and private-key encryption metadata.
-5. The backend returns a signed ES256 JWT access token.
+5. The backend sets a signed JWT access token in an `HttpOnly` cookie.
 
 Sign-in:
 
 1. The backend looks up the user by email.
 2. The backend verifies the submitted password against the stored salted scrypt hash.
-3. The backend returns a new signed ES256 JWT access token.
+3. The backend sets a new signed JWT access token in an `HttpOnly` cookie.
 
 Protected route access:
 
-1. The client sends the JWT in the `Authorization: Bearer <token>` header.
+1. The browser sends the JWT in the `HttpOnly` `__Host-convo_access_token` cookie.
 2. The auth middleware verifies the token with `JWT_PUBLIC_KEY`.
 3. The middleware allows ES256 application tokens only.
 4. The decoded token payload is attached to the request context.

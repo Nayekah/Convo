@@ -91,7 +91,7 @@ Password verification uses scrypt with a unique per-user salt. Private ECDH key 
 - Client-side private-key encryption before upload with PBKDF2-SHA-256 and AES-256-GCM
 - PostgreSQL persistence through Prisma
 - Docker Compose full-stack setup
-- Nginx reverse proxy
+- Caddy reverse proxy with HTTPS
 - Production-oriented port isolation
 - Husky pre-commit and pre-push quality gates
 
@@ -103,7 +103,7 @@ Password verification uses scrypt with a unique per-user salt. Private ECDH key 
 Convo/
   backend/          Hono API, Prisma, PostgreSQL, JWT library
   frontend/         React, Vite, TypeScript web client
-  reverse-proxy/    Nginx public entrypoint
+  reverse-proxy/    Caddy public HTTPS entrypoint
   docker-compose.yml
   .env.example
 ```
@@ -171,16 +171,54 @@ docker compose down
 
 Default access points:
 
-- Public application: `http://localhost:4021`
-- Local backend: `http://localhost:9173`
-- Local PostgreSQL: `localhost:5532`
+- Public application: `https://localhost`
+- Backend: internal Docker network only
+- PostgreSQL: internal Docker network only
 
 Public routing:
 
 - `/` -> frontend static server
 - `/api/*` -> backend API
 
-The backend and database ports are bound to `127.0.0.1` by default. The reverse proxy is the public entrypoint.
+The backend and database are not published to the host by default. The reverse proxy is the only public entrypoint.
+
+The Docker reverse proxy uses Caddy. For local development, Caddy serves `https://localhost` with its internal development CA. Browsers may warn until the Caddy local root CA is trusted.
+
+### Production VPS HTTPS
+
+For a real VPS with a trusted certificate, keep the same `docker-compose.yml` and change only `.env`. Caddy automatically obtains and renews certificates from Let's Encrypt when `PUBLIC_DOMAIN` is a public domain and `TLS_DIRECTIVE` is empty.
+
+Prerequisites:
+
+- A domain name with DNS `A` or `AAAA` records pointing to the VPS public IP.
+- Public inbound ports `80` and `443` open in the VPS firewall/security group.
+- Docker and Docker Compose installed on the VPS.
+
+Create the production environment file:
+
+```bash
+cp .env.example .env
+```
+
+Set at least:
+
+```env
+PUBLIC_DOMAIN=chat.example.com
+PUBLIC_ORIGIN=https://chat.example.com
+FRONTEND_ORIGIN=https://chat.example.com
+TLS_DIRECTIVE=
+POSTGRES_PASSWORD=replace-with-long-random-production-password
+JWT_PRIVATE_KEY="..."
+JWT_PUBLIC_KEY="..."
+```
+
+Run the production stack:
+
+```bash
+docker compose up --build -d
+```
+
+Caddy stores ACME certificates in the `convo_caddy_data` Docker volume, so certificates survive container recreation and renew automatically.
 
 ### Local Development
 
@@ -265,17 +303,18 @@ bun run test:jwt
 - Frontend derives a wrapping key with PBKDF2-SHA-256.
 - Frontend encrypts the exported private key using AES-256-GCM.
 - Backend stores the public key, encrypted private key, password hash, salts, and metadata.
+- Backend issues a signed JWT access token in an `HttpOnly` cookie.
 - Backend hashes the password with scrypt and returns a signed ES256 JWT access token.
 
 ### Login
 
 - User submits email and password.
 - Backend verifies the salted scrypt password hash.
-- Backend returns a signed JWT access token.
+- Backend issues a signed JWT access token in an `HttpOnly` cookie.
 
 ### Protected API Access
 
-- Client sends `Authorization: Bearer <token>`.
+- Browser sends the `HttpOnly` auth cookie with API requests.
 - Backend verifies the JWT signature and registered claims.
 - Backend accepts ES256 application tokens only.
 - Protected route handlers receive the decoded authentication payload.
@@ -295,11 +334,9 @@ bun run test:jwt
 
 - Do not commit `.env`.
 - Do not commit real JWT private keys.
+- Store JWTs in `HttpOnly` cookies instead of browser-readable storage.
 - Generate fresh keys for every deployment.
-- Use scrypt salts and private-key encryption salts as unique random values.
-- Keep JWTs short-lived enough for demo and deployment needs.
-- Keep `BACKEND_HOST_BIND=127.0.0.1` for public deployments.
-- Keep `POSTGRES_HOST_BIND=127.0.0.1` for public deployments.
+- Keep backend and PostgreSQL on the internal Docker network for public deployments.
 - Use HTTPS in front of the reverse proxy when deployed to the internet.
 
 ---

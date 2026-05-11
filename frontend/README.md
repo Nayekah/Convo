@@ -9,7 +9,7 @@ The Convo frontend is a React, Vite, and TypeScript application for the web chat
 - Derive a private-key wrapping key with PBKDF2-SHA-256.
 - Encrypt the exported ECDH private key with AES-256-GCM before sending it to the backend.
 - Send authentication requests to the backend through the `/api` reverse-proxy path.
-- Store the issued access token in `localStorage` as `convo_access_token`.
+- Rely on the backend-issued `HttpOnly` authentication cookie for authenticated requests.
 - Planned: derive chat keys with ECDH + HKDF, encrypt messages with AES-256-GCM, and verify HMAC-SHA-256 before decrypting received messages.
 
 ## Tech Stack
@@ -39,7 +39,7 @@ The frontend reads `VITE_API_BASE_URL` from the root `.env`. The default value i
 VITE_API_BASE_URL=/api
 ```
 
-This value is intentionally relative. In Docker, Nginx routes `/api/*` to the backend. In local development, Vite proxies `/api/*` to `http://localhost:9173`.
+This value is intentionally relative. In Docker, Caddy routes `/api/*` to the backend. In local development, Vite proxies `/api/*` to `http://localhost:9173`.
 
 ## Local Development
 

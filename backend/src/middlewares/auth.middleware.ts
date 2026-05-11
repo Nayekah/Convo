@@ -1,4 +1,5 @@
 import { createFactory } from 'hono/factory';
+import { getCookie } from 'hono/cookie';
 
 import { env } from '../configs/env.config';
 import { verify } from '../lib/jwt';
@@ -13,12 +14,15 @@ const factory = createFactory<{
 export const authMiddleware = () => {
   return factory.createMiddleware(async (c, next) => {
     const authHeader = c.req.header('Authorization');
+    const cookieToken = getCookie(c, '__Host-convo_access_token');
+    const bearerToken = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : undefined;
+    const token = cookieToken ?? bearerToken;
 
-    if (!authHeader?.startsWith('Bearer ')) {
+    if (!token) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-
-    const token = authHeader.slice(7);
 
     try {
       const decoded = verify(token, env.JWT_PUBLIC_KEY, {
