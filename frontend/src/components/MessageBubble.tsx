@@ -34,27 +34,49 @@ type MessageBubbleProps = {
 
 export const MessageBubble = ({ message }: MessageBubbleProps) => {
   const side = message.mine ? 'mine' : 'theirs';
-  const statusClass =
-    message.status === 'ok'
-      ? ''
-      : message.status === 'mac-invalid'
-        ? ' message-bubble--mac-invalid'
-        : ' message-bubble--decrypt-failed';
 
-  return (
-    <div className={`message-row message-row--${side}`}>
-      <div className={`message-bubble message-bubble--${side}${statusClass}`}>
-        {message.status === 'ok' ? (
-          <span className="message-bubble__text">{message.plaintext}</span>
-        ) : null}
-        {message.status === 'mac-invalid' ? (
+  if (message.status === 'mac-invalid') {
+    return (
+      <div className={`message-row message-row--${side}`}>
+        <div
+          className={`message-bubble message-bubble--${side} message-bubble--mac-invalid`}
+        >
+          <span className="message-bubble__failure-tag">
+            HMAC verification failed
+          </span>
           <span className="message-bubble__text">Message invalid</span>
-        ) : null}
-        {message.status === 'decrypt-failed' ? (
+          <span className="message-bubble__time">
+            {formatTimestamp(message.sentAt)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.status === 'decrypt-failed') {
+    return (
+      <div className={`message-row message-row--${side}`}>
+        <div
+          className={`message-bubble message-bubble--${side} message-bubble--decrypt-failed`}
+        >
+          <span className="message-bubble__failure-tag">
+            AES-GCM decryption failed
+          </span>
           <span className="message-bubble__text">
             Message cannot be decrypted
           </span>
-        ) : null}
+          <span className="message-bubble__time">
+            {formatTimestamp(message.sentAt)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`message-row message-row--${side}`}>
+      <div className={`message-bubble message-bubble--${side}`}>
+        <span className="message-bubble__text">{message.plaintext}</span>
         <span className="message-bubble__time">
           {formatTimestamp(message.sentAt)}
         </span>

@@ -1483,16 +1483,29 @@ a {
   border-bottom-left-radius: 4px;
 }
 
-.message-bubble--mac-invalid,
-.message-bubble--decrypt-failed {
-  background: rgba(239, 102, 134, 0.12);
+.message-bubble--mac-invalid {
+  background: rgba(239, 102, 134, 0.14);
   color: #ff8da4;
-  border-color: rgba(239, 102, 134, 0.45);
+  border-color: rgba(239, 102, 134, 0.55);
+}
+
+.message-bubble--decrypt-failed {
+  background: rgba(239, 182, 164, 0.14);
+  color: var(--accent-peach);
+  border-color: rgba(239, 182, 164, 0.55);
 }
 
 .message-bubble--mac-invalid .message-bubble__text,
 .message-bubble--decrypt-failed .message-bubble__text {
   font-style: italic;
+}
+
+.message-bubble__failure-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.78;
 }
 
 .message-bubble__text {
