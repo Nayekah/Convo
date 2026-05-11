@@ -17,7 +17,6 @@ export const SignUpPage = () => {
   });
 
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -46,7 +45,7 @@ export const SignUpPage = () => {
 
       localStorage.setItem(
         'convo_auth_user',
-        JSON.stringify({ ...response.user, username }),
+        JSON.stringify({ ...response.user}),
       );
       navigate('/');
     } catch (requestError) {
@@ -74,17 +73,6 @@ export const SignUpPage = () => {
           </header>
 
           <form className="auth-form" onSubmit={handleSubmit}>
-            <label>
-              Username
-              <input
-                autoComplete="username"
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="alice75"
-                required
-                type="text"
-                value={username}
-              />
-            </label>
 
             <label>
               Email
