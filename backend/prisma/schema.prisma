@@ -49,4 +49,5 @@ model Message {
   sentAt                    DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
 
   @@map("messages")
+  @@index([conversationId, sentAt], map: "messages_conversation_sent_at_idx")
 }
