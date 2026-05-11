@@ -1,3 +1,4 @@
+import { clearSession } from './session';
 import type { AuthResponse, SignInPayload, SignUpPayload } from '../types/auth';
 
 const API_BASE_URL =
@@ -32,6 +33,23 @@ const request = async <T>(path: string, options: RequestInit): Promise<T> => {
   }
 
   return data;
+};
+
+export const authedRequest = async <T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> => {
+  try {
+    return await request<T>(path, options);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      clearSession();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/signin') {
+        window.location.assign('/signin');
+      }
+    }
+    throw error;
+  }
 };
 
 export const authApi = {
