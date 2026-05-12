@@ -360,6 +360,7 @@ bun run test:jwt
 ---
 
 ## Contact
+If you have any questions or problems, please feel free to contact us on:
 
 Nayaka Ghana Subrata <13523090@std.stei.itb.ac.id>
 
