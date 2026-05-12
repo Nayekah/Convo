@@ -1,13 +1,7 @@
 import { useState } from 'react';
 
-import {
-  decryptPrivateKey,
-  importPrivateEcdhKey,
-} from '../lib/crypto-api';
-import {
-  getEncryptedPrivateKeyMetadata,
-  setPrivateKey,
-} from '../lib/session';
+import { decryptPrivateKey, importPrivateEcdhKey } from '../lib/crypto-api';
+import { getEncryptedPrivateKeyMetadata, setPrivateKey } from '../lib/session';
 
 type UnlockPromptProps = {
   onUnlocked: () => void;

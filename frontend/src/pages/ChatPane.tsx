@@ -63,12 +63,11 @@ const verifyAndDecrypt = async (
   const envelope = buildEnvelope(message);
   const mine = message.senderId === myUserId;
 
-  let macOk = false;
-  try {
-    macOk = await verifyEnvelopeMac(envelope, message.mac, chatKeys.hmacKey);
-  } catch {
-    macOk = false;
-  }
+  const macOk = await verifyEnvelopeMac(
+    envelope,
+    message.mac,
+    chatKeys.hmacKey,
+  ).catch(() => false);
 
   if (!macOk) {
     return {
@@ -241,7 +240,10 @@ export const ChatPane = () => {
       throw new Error('Not ready to send.');
     }
 
-    const { ciphertext, iv } = await encryptMessage(text, loadState.keys.aesKey);
+    const { ciphertext, iv } = await encryptMessage(
+      text,
+      loadState.keys.aesKey,
+    );
     const sentAt = new Date().toISOString();
     const envelope: MessageEnvelope = {
       version: ENVELOPE_VERSION,
@@ -293,8 +295,8 @@ export const ChatPane = () => {
         <div className="chat-pane__notice">
           <p>This conversation isn&apos;t loaded.</p>
           <p>
-            <Link to="/chat">Go back to your contacts</Link> and pick the
-            person you want to talk to.
+            <Link to="/chat">Go back to your contacts</Link> and pick the person
+            you want to talk to.
           </p>
         </div>
       </div>

@@ -88,7 +88,10 @@ export const ContactSidebar = () => {
       <div className="chat-sidebar__profile">
         <div className="chat-sidebar__profile-text">
           <span className="chat-sidebar__profile-label">Signed in as</span>
-          <span className="chat-sidebar__profile-email" title={currentUser?.email}>
+          <span
+            className="chat-sidebar__profile-email"
+            title={currentUser?.email}
+          >
             {currentUser?.email ?? 'Unknown'}
           </span>
         </div>

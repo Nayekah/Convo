@@ -14,11 +14,20 @@
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	}
 
+	@static {
+		path /assets/*
+		path *.css *.js *.mjs *.png *.jpg *.jpeg *.gif *.webp *.ico *.svg *.woff *.woff2
+	}
+
+	header @static Cache-Control "public, max-age=2592000, immutable"
+
 	handle /api/* {
 		reverse_proxy backend:9173
 	}
 
 	handle {
-		reverse_proxy frontend:4021
+		root * /srv
+		try_files {path} {path}/ /index.html
+		file_server
 	}
 }

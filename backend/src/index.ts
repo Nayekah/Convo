@@ -26,7 +26,7 @@ app.use('/api/*', async (c, next) => {
 
   const origin = c.req.header('Origin');
 
-  if (origin !== env.FRONTEND_ORIGIN) {
+  if (origin && !env.FRONTEND_ORIGINS.includes(origin)) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
@@ -36,7 +36,7 @@ app.use('/api/*', async (c, next) => {
 app.use(
   '/api/*',
   cors({
-    origin: env.FRONTEND_ORIGIN,
+    origin: (origin) => (env.FRONTEND_ORIGINS.includes(origin) ? origin : null),
     allowMethods: ['GET', 'POST', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

@@ -44,7 +44,10 @@ export const authedRequest = async <T>(
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       clearSession();
-      if (typeof window !== 'undefined' && window.location.pathname !== '/signin') {
+      if (
+        typeof window !== 'undefined' &&
+        window.location.pathname !== '/signin'
+      ) {
         window.location.assign('/signin');
       }
     }

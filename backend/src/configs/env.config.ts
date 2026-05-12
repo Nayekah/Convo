@@ -13,7 +13,7 @@ const EnvSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().default(9173),
   DATABASE_URL: z.url(),
-  FRONTEND_ORIGIN: z.url().default('http://localhost:4021'),
+  FRONTEND_ORIGIN: z.string().min(1).default('http://localhost:4021'),
   JWT_ISSUER: z.string().min(1),
   JWT_AUDIENCE: z.string().min(1),
   JWT_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().positive().default(3600),
@@ -29,4 +29,43 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const env = parsed.data;
+const parseFrontendOrigins = (
+  rawOrigins: string,
+  nodeEnv: 'development' | 'test' | 'production',
+) => {
+  const configuredOrigins = rawOrigins
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  const origins =
+    nodeEnv === 'development'
+      ? [...configuredOrigins, 'http://localhost:4021', 'http://127.0.0.1:4021']
+      : configuredOrigins;
+
+  const uniqueOrigins = [...new Set(origins)];
+  const invalidOrigins = uniqueOrigins.filter((origin) => {
+    try {
+      new URL(origin);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+
+  if (invalidOrigins.length > 0) {
+    console.error('Invalid FRONTEND_ORIGIN values');
+    console.error(invalidOrigins);
+    process.exit(1);
+  }
+
+  return uniqueOrigins;
+};
+
+export const env = {
+  ...parsed.data,
+  FRONTEND_ORIGINS: parseFrontendOrigins(
+    parsed.data.FRONTEND_ORIGIN,
+    parsed.data.NODE_ENV,
+  ),
+};

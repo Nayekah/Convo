@@ -8,9 +8,8 @@ export const ChatEmptyState = () => {
       </div>
       <h2 className="chat-empty__title">Pick a contact to start chatting</h2>
       <p className="chat-empty__text">
-        Every message is encrypted in your browser before it reaches the
-        server. We can&apos;t read them, and neither can anyone listening on the
-        wire.
+        Every message is encrypted in your browser before it reaches the server.
+        We can&apos;t read them, and neither can anyone listening on the wire.
       </p>
     </div>
   );

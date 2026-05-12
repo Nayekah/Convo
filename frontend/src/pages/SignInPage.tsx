@@ -6,10 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AppNavbar } from '../components/NavBar';
 import { WhiteBoxLogo } from '../components/WhiteBoxLogo';
 import { ApiError, authApi } from '../lib/api';
-import {
-  decryptPrivateKey,
-  importPrivateEcdhKey,
-} from '../lib/crypto-api';
+import { decryptPrivateKey, importPrivateEcdhKey } from '../lib/crypto-api';
 import { usePageMeta } from '../lib/page-meta';
 import {
   setEncryptedPrivateKeyMetadata,

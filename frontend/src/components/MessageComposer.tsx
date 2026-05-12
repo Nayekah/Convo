@@ -20,9 +20,7 @@ export const MessageComposer = ({ disabled, onSend }: MessageComposerProps) => {
     }
   }, [disabled]);
 
-  const handleSubmit = async (
-    event: React.SyntheticEvent<HTMLFormElement>,
-  ) => {
+  const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = text.trim();
     if (trimmed.length === 0 || isDisabled) return;

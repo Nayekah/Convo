@@ -1,10 +1,12 @@
 services:
   reverse-proxy:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: reverse-proxy/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
     container_name: convo-reverse-proxy
     depends_on:
-      frontend:
-        condition: service_started
       backend:
         condition: service_started
     environment:
@@ -14,24 +16,10 @@ services:
       - '${APP_HOST_BIND:-0.0.0.0}:${HTTP_HOST_PORT:-80}:80'
       - '${APP_HOST_BIND:-0.0.0.0}:${HTTPS_HOST_PORT:-443}:443'
     volumes:
-      - ./reverse-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
       - convo_caddy_data:/data
       - convo_caddy_config:/config
     networks:
       - public
-      - internal
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: /api
-    container_name: convo-frontend
-    expose:
-      - '4021'
-    networks:
       - internal
     restart: unless-stopped
 
@@ -44,7 +32,7 @@ services:
       NODE_ENV: production
       PORT: 9173
       DATABASE_URL: postgres://${POSTGRES_USER:-convo}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-convo_db}
-      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-${PUBLIC_ORIGIN:-https://localhost}}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-https://localhost}
       JWT_ISSUER: ${JWT_ISSUER:-convo-auth}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-convo-web}
       JWT_ACCESS_TOKEN_TTL_SECONDS: ${JWT_ACCESS_TOKEN_TTL_SECONDS:-3600}

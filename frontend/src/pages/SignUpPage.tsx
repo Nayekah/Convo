@@ -80,7 +80,9 @@ export const SignUpPage = () => {
         if (requestError.status === 409) {
           setError('That email is already registered. Try signing in instead.');
         } else if (requestError.status === 400) {
-          setError(requestError.message || 'Please check your details and try again.');
+          setError(
+            requestError.message || 'Please check your details and try again.',
+          );
         } else if (requestError.status < 500) {
           setError(requestError.message || 'Unable to create account.');
         } else {
@@ -108,7 +110,6 @@ export const SignUpPage = () => {
           </header>
 
           <form className="auth-form" onSubmit={handleSubmit}>
-
             <label>
               Email
               <input

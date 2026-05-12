@@ -43,6 +43,10 @@ Required variables include:
 - `JWT_PRIVATE_KEY`
 - `JWT_PUBLIC_KEY`
 
+`FRONTEND_ORIGIN` accepts a comma-separated allowlist. In `NODE_ENV=development`,
+the backend also accepts the Vite dev server defaults `http://localhost:4021`
+and `http://127.0.0.1:4021`.
+
 When running through Docker Compose, the backend receives its environment from the root `docker-compose.yml`. When running the backend directly, `src/configs/env.config.ts` loads the root `.env` file explicitly.
 
 For VPS deployment, use a separate uncommitted `.env.production` with production origins, fresh JWT keys, and strong PostgreSQL credentials.
@@ -98,8 +102,8 @@ Sign-up:
 2. The frontend derives a private-key wrapping key with PBKDF2-SHA-256.
 3. The frontend encrypts the ECDH private key with AES-256-GCM before submission.
 4. The backend hashes the password with scrypt and a unique salt.
-4. The backend stores the public key, encrypted private key, and private-key encryption metadata.
-5. The backend sets a signed JWT access token in an `HttpOnly` cookie.
+5. The backend stores the public key, encrypted private key, and private-key encryption metadata.
+6. The backend sets a signed JWT access token in an `HttpOnly` cookie.
 
 Sign-in:
 

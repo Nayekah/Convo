@@ -11,7 +11,9 @@ export const RequireAuth = ({ children }: RequireAuthProps) => {
   const location = useLocation();
 
   if (!isAuthenticated()) {
-    return <Navigate to="/signin" replace state={{ from: location.pathname }} />;
+    return (
+      <Navigate to="/signin" replace state={{ from: location.pathname }} />
+    );
   }
 
   return <>{children}</>;

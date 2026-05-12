@@ -149,6 +149,11 @@ Before deploying publicly, update at least:
 
 The repository uses a single root `.env` file as the source of truth for Docker and local development.
 
+`FRONTEND_ORIGIN` may be a comma-separated allowlist. During local backend
+development, `http://localhost:4021` and `http://127.0.0.1:4021` are accepted
+automatically so the Vite frontend can sign up and sign in without hitting the
+origin guard.
+
 ---
 
 ## How to Run
@@ -181,12 +186,12 @@ Default access points:
 
 Public routing:
 
-- `/` -> frontend static server
+- `/` -> frontend static files served by Caddy
 - `/api/*` -> backend API
 
 The backend and database are not published to the host by default. The reverse proxy is the only public entrypoint.
 
-The Docker reverse proxy uses Caddy. For local development, Caddy serves `https://localhost` with its internal development CA. Browsers may warn until the Caddy local root CA is trusted.
+The Docker reverse proxy uses Caddy for both HTTPS termination and static frontend delivery. For local development, Caddy serves `https://localhost` with its internal development CA. Browsers may warn until the Caddy local root CA is trusted.
 
 ### Production VPS HTTPS
 

@@ -2,7 +2,9 @@ import type { IncomingWsEvent, OutgoingSendEvent } from '../types/chat';
 
 export type ChatSocketHandlers = {
   onReady?: () => void;
-  onStored: (event: Extract<IncomingWsEvent, { type: 'message:stored' }>) => void;
+  onStored: (
+    event: Extract<IncomingWsEvent, { type: 'message:stored' }>,
+  ) => void;
   onError?: (message: string) => void;
   onClose?: () => void;
 };

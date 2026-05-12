@@ -70,15 +70,12 @@ Planned pages:
 
 ## Production Container
 
-The frontend Dockerfile is production-oriented:
+The production Docker stack does not run a dedicated frontend web server container.
+Instead, the reverse-proxy image builds the Vite app and serves the generated
+static files directly from Caddy.
 
-1. Build the Vite app with Bun.
-2. Copy the generated `dist` output into an Nginx image.
-3. Serve the static app on container port `4021`.
-
-The frontend container is not intended to be exposed directly. The root reverse proxy is the public entrypoint and forwards regular page requests to this service.
-
-For VPS deployment, the Compose reverse proxy should usually bind to `127.0.0.1:4021`, with host-level Nginx or Caddy handling HTTPS and proxying to it.
+For VPS deployment, the Compose Caddy service remains the public HTTPS
+entrypoint and serves both the frontend and `/api/*` backend traffic.
 
 ## Scripts
 
