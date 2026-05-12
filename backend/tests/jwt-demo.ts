@@ -39,7 +39,9 @@ const issuer = env.JWT_ISSUER ?? 'convo-auth';
 const audience = env.JWT_AUDIENCE ?? 'convo-web';
 
 if (!privateKey || !publicKey) {
-  throw new Error('JWT_PRIVATE_KEY dan JWT_PUBLIC_KEY harus tersedia di ../.env');
+  throw new Error(
+    'JWT_PRIVATE_KEY dan JWT_PUBLIC_KEY harus tersedia di ../.env',
+  );
 }
 
 const now = Math.floor(Date.now() / 1000);
@@ -117,10 +119,7 @@ writeFileSync(resolve(outputDir, 'invalid-format.jwt'), invalidFormatToken);
 
 const divider = () => console.log('\n' + '='.repeat(72));
 
-const logVerifyFailure = (
-  label: string,
-  callback: () => void,
-): void => {
+const logVerifyFailure = (label: string, callback: () => void): void => {
   divider();
   console.log(label);
   try {

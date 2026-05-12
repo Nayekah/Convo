@@ -6,7 +6,12 @@ import { env } from '../configs/env.config';
 import { sign } from '../lib/jwt';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { createUser, findUserByEmail } from '../repositories/auth.repository';
-import { meRoute, signinRoute, signupRoute } from '../routes/auth.route';
+import {
+  logoutRoute,
+  meRoute,
+  signinRoute,
+  signupRoute,
+} from '../routes/auth.route';
 import type { AuthTokenPayload } from '../types/auth.type';
 import { signinBodySchema, signupBodySchema } from '../types/auth.type';
 import { generateSalt, hashPassword, verifyPassword } from '../utils/password';
@@ -43,6 +48,17 @@ const setAccessTokenCookie = (c: Context, token: string) => {
   setCookie(c, ACCESS_TOKEN_COOKIE, token, {
     httpOnly: true,
     maxAge: env.JWT_ACCESS_TOKEN_TTL_SECONDS,
+    path: '/',
+    sameSite: 'Lax',
+    secure: true,
+  });
+};
+
+const clearAccessTokenCookie = (c: Context) => {
+  setCookie(c, ACCESS_TOKEN_COOKIE, '', {
+    httpOnly: true,
+    maxAge: 0,
+    expires: new Date(0),
     path: '/',
     sameSite: 'Lax',
     secure: true,
@@ -187,6 +203,11 @@ authRouter.openapi(signinRoute, async (c) => {
     },
     200,
   );
+});
+
+authRouter.openapi(logoutRoute, async (c) => {
+  clearAccessTokenCookie(c);
+  return c.json({ success: true }, 200);
 });
 
 authRouter.use('/auth/me', authMiddleware());

@@ -121,6 +121,24 @@ export const signinRoute = createRoute({
   },
 });
 
+export const logoutRoute = createRoute({
+  method: 'post',
+  path: '/auth/logout',
+  tags: ['auth'],
+  responses: {
+    200: {
+      description: 'Sign out success',
+      content: {
+        'application/json': {
+          schema: z.object({
+            success: z.literal(true),
+          }),
+        },
+      },
+    },
+  },
+});
+
 export const meRoute = createRoute({
   method: 'get',
   path: '/auth/me',
