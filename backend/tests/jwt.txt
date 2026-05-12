@@ -1,0 +1,2 @@
+queries:
+curl -k -i https://localhost/api/contacts -H "Authorization: Bearer <token>"

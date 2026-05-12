@@ -6,6 +6,7 @@
     "build": "tsc",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "test:jwt": "tsx --test src/lib/jwt.test.ts",
+    "demo:jwt": "bun tests/jwt-demo.ts",
     "start": "bun src/index.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
