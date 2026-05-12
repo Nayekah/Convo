@@ -6,8 +6,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AppNavbar } from '../components/NavBar';
 import { WhiteBoxLogo } from '../components/WhiteBoxLogo';
 import { ApiError, authApi } from '../lib/api';
-import { createEncryptedEcdhKeys } from '../lib/crypto-api';
+import {
+  createEncryptedEcdhKeys,
+  decryptPrivateKey,
+  importPrivateEcdhKey,
+} from '../lib/crypto-api';
 import { usePageMeta } from '../lib/page-meta';
+import {
+  setEncryptedPrivateKeyMetadata,
+  setPrivateKey,
+  setUser,
+} from '../lib/session';
 
 export const SignUpPage = () => {
   usePageMeta({
@@ -17,7 +26,6 @@ export const SignUpPage = () => {
   });
 
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,14 +35,19 @@ export const SignUpPage = () => {
 
   const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsLoading(true);
     setError(null);
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
-      setIsLoading(false);
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const cryptoBundle = await createEncryptedEcdhKeys(password);
@@ -44,14 +57,35 @@ export const SignUpPage = () => {
         ...cryptoBundle,
       });
 
-      localStorage.setItem(
-        'convo_auth_user',
-        JSON.stringify({ ...response.user, username }),
-      );
-      navigate('/');
+      const pkcs8 = await decryptPrivateKey(password, response.user);
+      const privateKey = await importPrivateEcdhKey(pkcs8);
+
+      setUser({
+        id: response.user.id,
+        email: response.user.email,
+        publicKey: response.user.publicKey,
+        createdAt: response.user.createdAt,
+      });
+      setEncryptedPrivateKeyMetadata({
+        encryptedPrivateKey: response.user.encryptedPrivateKey,
+        privateKeyIv: response.user.privateKeyIv,
+        privateKeySalt: response.user.privateKeySalt,
+        privateKeyKdfIterations: response.user.privateKeyKdfIterations,
+      });
+      setPrivateKey(privateKey);
+
+      navigate('/chat');
     } catch (requestError) {
-      if (requestError instanceof ApiError && requestError.status < 500) {
-        setError('Unable to create account');
+      if (requestError instanceof ApiError) {
+        if (requestError.status === 409) {
+          setError('That email is already registered. Try signing in instead.');
+        } else if (requestError.status === 400) {
+          setError(requestError.message || 'Please check your details and try again.');
+        } else if (requestError.status < 500) {
+          setError(requestError.message || 'Unable to create account.');
+        } else {
+          setError('Application error. Please try again later.');
+        }
       } else {
         setError('Application error. Please try again later.');
       }
@@ -74,17 +108,6 @@ export const SignUpPage = () => {
           </header>
 
           <form className="auth-form" onSubmit={handleSubmit}>
-            <label>
-              Username
-              <input
-                autoComplete="username"
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="alice75"
-                required
-                type="text"
-                value={username}
-              />
-            </label>
 
             <label>
               Email
@@ -103,8 +126,9 @@ export const SignUpPage = () => {
               <span className="auth-form__password-wrapper">
                 <input
                   autoComplete="new-password"
+                  minLength={8}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="*******"
+                  placeholder="At least 8 characters"
                   required
                   type={isPasswordVisible ? 'text' : 'password'}
                   value={password}

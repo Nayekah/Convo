@@ -2,7 +2,7 @@
   "name": "convo-backend",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "bun --hot src/index.ts",
     "build": "tsc",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "test:jwt": "tsx --test src/lib/jwt.test.ts",

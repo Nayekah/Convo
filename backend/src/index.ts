@@ -1,11 +1,22 @@
-import { serve } from '@hono/node-server';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { createBunWebSocket } from 'hono/bun';
 import { cors } from 'hono/cors';
 
 import { env } from './configs/env.config';
 import { apiRouter } from './controllers/api.controller';
+import type { AuthTokenPayload } from './types/auth.type';
+import {
+  authenticateRequest,
+  buildChatWebSocketHandlers,
+} from './ws/chat.websocket';
 
-const app = new OpenAPIHono();
+type AppVariables = {
+  chatAuth: AuthTokenPayload;
+};
+
+const { upgradeWebSocket, websocket } = createBunWebSocket();
+
+const app = new OpenAPIHono<{ Variables: AppVariables }>();
 
 app.use('/api/*', async (c, next) => {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(c.req.method)) {
@@ -35,14 +46,26 @@ app.use(
 
 app.get('/', (c) => c.json({ message: 'Convo backend is running' }));
 
+app.get(
+  '/api/ws',
+  async (c, next) => {
+    try {
+      c.set('chatAuth', authenticateRequest(c));
+    } catch {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    await next();
+  },
+  upgradeWebSocket((c) => buildChatWebSocketHandlers(c.get('chatAuth'))),
+);
+
 app.route('/api', apiRouter);
 
-serve(
-  {
-    fetch: app.fetch,
-    port: env.PORT,
-  },
-  (info) => {
-    console.log(`Server listening on http://localhost:${info.port}`);
-  },
-);
+console.log(`Server listening on http://localhost:${env.PORT}`);
+
+export default {
+  port: env.PORT,
+  fetch: app.fetch,
+  websocket,
+};

@@ -13,3 +13,14 @@ export const encodeBase64Url = (bytes: Uint8Array): string => {
     .replace(/\//g, '_')
     .replace(/=+$/g, '');
 };
+
+export const decodeBase64Url = (value: string): Uint8Array => {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
+  const binary = atob(padded + padding);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+};

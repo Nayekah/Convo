@@ -6,7 +6,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AppNavbar } from '../components/NavBar';
 import { WhiteBoxLogo } from '../components/WhiteBoxLogo';
 import { ApiError, authApi } from '../lib/api';
+import {
+  decryptPrivateKey,
+  importPrivateEcdhKey,
+} from '../lib/crypto-api';
 import { usePageMeta } from '../lib/page-meta';
+import {
+  setEncryptedPrivateKeyMetadata,
+  setPrivateKey,
+  setUser,
+} from '../lib/session';
 
 export const SignInPage = () => {
   usePageMeta({
@@ -29,11 +38,34 @@ export const SignInPage = () => {
 
     try {
       const response = await authApi.signIn({ email, password });
-      localStorage.setItem('convo_auth_user', JSON.stringify(response.user));
-      navigate('/');
+
+      const pkcs8 = await decryptPrivateKey(password, response.user);
+      const privateKey = await importPrivateEcdhKey(pkcs8);
+
+      setUser({
+        id: response.user.id,
+        email: response.user.email,
+        publicKey: response.user.publicKey,
+        createdAt: response.user.createdAt,
+      });
+      setEncryptedPrivateKeyMetadata({
+        encryptedPrivateKey: response.user.encryptedPrivateKey,
+        privateKeyIv: response.user.privateKeyIv,
+        privateKeySalt: response.user.privateKeySalt,
+        privateKeyKdfIterations: response.user.privateKeyKdfIterations,
+      });
+      setPrivateKey(privateKey);
+
+      navigate('/chat');
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.status < 500) {
         setError('Invalid email or password');
+      } else if (
+        requestError instanceof DOMException ||
+        (requestError instanceof Error &&
+          requestError.name === 'OperationError')
+      ) {
+        setError('Unable to unlock your private key. Please try again.');
       } else {
         setError('Application error. Please try again later.');
       }

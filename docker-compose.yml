@@ -44,7 +44,7 @@ services:
       NODE_ENV: production
       PORT: 9173
       DATABASE_URL: postgres://${POSTGRES_USER:-convo}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-convo_db}
-      FRONTEND_ORIGIN: ${PUBLIC_ORIGIN:-https://localhost}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-${PUBLIC_ORIGIN:-https://localhost}}
       JWT_ISSUER: ${JWT_ISSUER:-convo-auth}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-convo-web}
       JWT_ACCESS_TOKEN_TTL_SECONDS: ${JWT_ACCESS_TOKEN_TTL_SECONDS:-3600}
@@ -55,6 +55,8 @@ services:
         condition: service_healthy
     expose:
       - '9173'
+    ports:
+      - '127.0.0.1:9173:9173'
     networks:
       - internal
     restart: unless-stopped
@@ -75,6 +77,8 @@ services:
       retries: 10
     expose:
       - '5432'
+    ports:
+      - '127.0.0.1:5532:5432'
     networks:
       - internal
     restart: unless-stopped
@@ -82,7 +86,6 @@ services:
 networks:
   public:
   internal:
-    internal: true
 
 volumes:
   convo_postgres_data:
