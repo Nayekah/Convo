@@ -9,6 +9,8 @@
 
 `Convo` is a secure web-based messaging application focused on private one-to-one communication, user authentication, and a full-stack deployment setup that can run locally or in Docker.
 
+**The app is deployed and ready to use at <https://convo.ykd.dev>.**
+
 It consists of a landing page, sign-up and sign-in flow, contact list, one-to-one chat, encrypted message history, real-time message delivery, and the supporting backend and database services behind them.
 
 ## Tech Stack and Languages
@@ -79,29 +81,13 @@ The project is built with a split frontend-backend architecture. The frontend pr
 
 ## Features
 
-- Landing page
-- Sign-up page
-- Sign-in page
-- Contact list and one-to-one chat page
-- Salted scrypt password hashing
-- Custom JWT sign and verify library
-- ES256, ES384, and ES512 support
-- `HttpOnly` JWT access cookie with `hono/cookie`
-- JWT unit tests with Node.js `node:test`
-- Client-side ECDH key generation
-- Client-side private-key encryption before upload with PBKDF2-SHA-256 and AES-256-GCM
-- Client-side chat key derivation with ECDH and HKDF-SHA-256
-- Encrypted message history decryption in the browser
-- HMAC-SHA-256 verification before message decryption
-- Unlock flow for reloading the encrypted private key after refresh
-- Contact list and one-to-one conversation REST APIs
-- Encrypted message history API
-- Backend WebSocket endpoint for encrypted message persistence and broadcast
-- PostgreSQL persistence through Prisma
-- Docker Compose full-stack setup
-- Caddy reverse proxy with HTTPS and static frontend serving
-- Production-oriented port isolation
-- Husky pre-commit and pre-push quality gates
+- Public landing page, account registration, sign-in, contact list, and one-to-one chat interface.
+- End-to-end encrypted messaging with browser-side ECDH key generation, encrypted private-key storage, HKDF-SHA-256 key derivation, AES-256-GCM message encryption, and HMAC-SHA-256 verification before decryption.
+- Authenticated REST APIs for contacts, one-to-one conversation creation or lookup, and encrypted message history.
+- WebSocket endpoint for storing encrypted message envelopes and broadcasting them to chat participants.
+- Salted scrypt password hashing, `HttpOnly` JWT access cookies, and a custom JWT library with ES256, ES384, and ES512 support.
+- PostgreSQL persistence through Prisma, with Docker Compose and Caddy reverse proxy support for full-stack deployment.
+- Node.js `node:test` coverage for the JWT library and Husky pre-commit/pre-push quality gates.
 
 ---
 
