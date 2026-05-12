@@ -3,6 +3,7 @@
 > Secure web chat with end-to-end encrypted messaging
 
 <h3 align="center">End-to-end encrypted web chat with JWT authentication, ECDH key exchange, and AES-based private messaging</h3>
+<img width="2559" height="1248" alt="image" src="https://github.com/user-attachments/assets/84d9b8c8-7b81-47d6-9aee-2123ce63ff98" />
 
 ## Overview
 
