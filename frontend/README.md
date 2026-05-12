@@ -1,16 +1,19 @@
 # Convo Frontend
 
-The Convo frontend is a React, Vite, and TypeScript application for the web chat client. It provides the landing page, sign-up flow, sign-in flow, client-side cryptographic key preparation, and planned encrypted chat UI required by the assignment.
+The Convo frontend is a React, Vite, and TypeScript web client for the encrypted chat application. It handles authentication screens, contact selection, conversation loading, client-side cryptography, and encrypted messaging UI.
 
 ## Responsibilities
 
-- Render the public landing page and authentication pages.
-- Generate the user's ECDH key pair during sign-up with the Web Crypto API.
-- Derive a private-key wrapping key with PBKDF2-SHA-256.
-- Encrypt the exported ECDH private key with AES-256-GCM before sending it to the backend.
-- Send authentication requests to the backend through the `/api` reverse-proxy path.
-- Rely on the backend-issued `HttpOnly` authentication cookie for authenticated requests.
-- Planned: derive chat keys with ECDH + HKDF, encrypt messages with AES-256-GCM, and verify HMAC-SHA-256 before decrypting received messages.
+- Render the landing page, sign-up page, sign-in page, contact sidebar, and chat pages
+- Generate the user's ECDH keypair in the browser during sign-up
+- Derive a wrapping key from the password with PBKDF2-SHA-256
+- Encrypt the exported private key with AES-256-GCM before uploading it
+- Store the authenticated user profile and encrypted private-key metadata in `sessionStorage`
+- Keep the decrypted private key only in memory
+- Load contacts and create or reopen one-to-one conversations
+- Derive per-conversation chat keys with ECDH and HKDF-SHA-256
+- Verify HMAC-SHA-256 before decrypting message history and live messages
+- Encrypt outgoing messages and send them through the backend WebSocket
 
 ## Tech Stack
 
@@ -22,26 +25,27 @@ The Convo frontend is a React, Vite, and TypeScript application for the web chat
 - ESLint
 - Prettier from the repository root
 
-JWTs are sent to the backend as `Authorization: Bearer <token>`. Cookie storage is allowed by the assignment, but is not required by the current implementation.
-
 ## Environment
 
-The project uses a single environment template at the repository root:
+The frontend uses the root environment template:
 
 ```bash
 cd ..
 cp .env.example .env
 ```
 
-The frontend reads `VITE_API_BASE_URL` from the root `.env`. The default value is:
+Relevant variable:
 
 ```env
 VITE_API_BASE_URL=/api
 ```
 
-This value is intentionally relative. In Docker, Caddy routes `/api/*` to the backend. In local development, Vite proxies `/api/*` to `http://localhost:9173`.
+This stays relative on purpose:
 
-## Local Development
+- In Docker, Caddy routes `/api/*` to the backend
+- In local development, Vite proxies `/api/*` to `http://localhost:9173`
+
+## How to Run
 
 Start the backend first, then run the frontend:
 
@@ -51,31 +55,29 @@ bun install
 bun run dev
 ```
 
-The development server runs at:
+Development URL:
 
 ```text
 http://localhost:4021
 ```
 
-Available pages:
+Available routes:
 
 - `/`
 - `/signin`
 - `/signup`
-
-Planned pages:
-
-- `/contacts`
+- `/chat`
 - `/chat/:conversationId`
+
+## Authentication Model
+
+- API requests use `credentials: include`
+- Authentication relies on the backend-issued `__Host-convo_access_token` `HttpOnly` cookie
+- On `401`, the frontend clears local session data and redirects back to `/signin`
 
 ## Production Container
 
-The production Docker stack does not run a dedicated frontend web server container.
-Instead, the reverse-proxy image builds the Vite app and serves the generated
-static files directly from Caddy.
-
-For VPS deployment, the Compose Caddy service remains the public HTTPS
-entrypoint and serves both the frontend and `/api/*` backend traffic.
+The Docker stack does not run a separate frontend web server container. The reverse-proxy image builds the Vite app and serves the generated static files directly from Caddy.
 
 ## Scripts
 
@@ -91,7 +93,7 @@ bun run preview
 ```text
 src/
   components/     Shared UI components
-  lib/            API, metadata, base64url, and crypto helpers
+  lib/            API, session, socket, crypto, and helper modules
   pages/          Route-level pages
   types/          Shared frontend TypeScript types
   App.tsx         Route composition
@@ -100,22 +102,23 @@ src/
 
 ## Cryptography Notes
 
-During sign-up, the frontend generates an ECDH P-256 key pair. The public key and encrypted private key material are sent to the backend. The backend must never receive the plaintext ECDH private key.
+During sign-up:
 
-The private key encryption flow uses:
+- The frontend generates an ECDH P-256 keypair
+- The public key is sent to the backend
+- The private key is encrypted locally before upload
 
-- PBKDF2 with SHA-256 to derive a wrapping key from the user's password.
-- AES-256-GCM to encrypt the exported private key.
-- Base64url encoding for transport-safe key material.
+The private-key protection flow uses:
 
-Planned chat cryptography:
+- PBKDF2 with SHA-256
+- AES-256-GCM
+- Base64url-encoded transport data
 
-- Import the current user's decrypted ECDH private key.
-- Fetch the peer user's ECDH public key from the backend.
-- Derive a shared secret with ECDH P-256.
-- Use HKDF-SHA-256 to derive separate AES-256-GCM and HMAC-SHA-256 keys.
-- Encrypt outgoing plaintext with AES-256-GCM and a fresh IV.
-- Compute HMAC-SHA-256 over the encrypted message envelope.
-- Verify HMAC before decryption.
-- Show `Message invalid` when MAC verification fails.
-- Show `Message cannot be decrypted` when decryption fails.
+The chat flow uses:
+
+- ECDH P-256 to derive a shared secret with the peer's public key
+- HKDF-SHA-256 to derive separate AES and HMAC keys
+- AES-256-GCM to encrypt outgoing messages
+- HMAC-SHA-256 to authenticate the encrypted message envelope
+
+If the page reloads, the decrypted private key is gone from memory. The user must unlock it again locally with their password before chat history can be decrypted and the socket can be opened.

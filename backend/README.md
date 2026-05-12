@@ -1,15 +1,16 @@
 # Convo Backend
 
-The Convo backend is a Hono, TypeScript, and Prisma service that handles authentication, user key metadata storage, scrypt password hashing, JWT issuance, and planned encrypted chat delivery for the Convo web client.
+The Convo backend is a Bun, Hono, TypeScript, and Prisma service that provides authentication, key-metadata storage, conversation APIs, encrypted message persistence, and WebSocket delivery for the Convo web client.
 
 ## Responsibilities
 
-- Register users with email, password hash, password salt, ECDH public key, encrypted ECDH private key, and key-recovery metadata.
-- Authenticate users with salted password verification.
-- Issue JWS JWT access tokens signed with the custom ES256 JWT library in `HttpOnly` cookies.
-- Verify access tokens for protected routes.
-- Store user records in PostgreSQL through Prisma.
-- Planned: store encrypted message envelopes and relay them over WebSocket without plaintext access.
+- Register users with email, password hash, password salt, ECDH public key, encrypted ECDH private key, and key-recovery metadata
+- Authenticate users with salted scrypt password verification
+- Issue ES256 JWT access tokens in the `__Host-convo_access_token` `HttpOnly` cookie
+- Verify access tokens for protected HTTP routes and the chat WebSocket
+- Expose contacts, conversation creation, and encrypted message history APIs
+- Persist encrypted message envelopes without plaintext access
+- Relay encrypted message envelopes through `/api/ws`
 
 ## Tech Stack
 
@@ -20,22 +21,23 @@ The Convo backend is a Hono, TypeScript, and Prisma service that handles authent
 - PostgreSQL
 - Zod
 - Node `crypto`
-- Node.js `node:test` for JWT unit tests
+- Node `node:test` for JWT unit tests
 - Custom JWT library with ES256, ES384, and ES512 support
 
-The JWT library supports ES256, ES384, and ES512 because the assignment table requires those algorithms. The application authentication flow itself only issues and accepts ES256 tokens.
+The assignment requires ES256, ES384, and ES512 support in the JWT library. The application authentication flow itself issues and accepts ES256 tokens only.
 
 ## Environment
 
-The backend reads environment variables from the repository root `.env` file. Start by creating it from the root template:
+The backend reads environment variables from the repository root `.env` file:
 
 ```bash
 cd ..
 cp .env.example .env
 ```
 
-Required variables include:
+Important variables:
 
+- `NODE_ENV`
 - `DATABASE_URL`
 - `FRONTEND_ORIGIN`
 - `JWT_ISSUER`
@@ -43,15 +45,13 @@ Required variables include:
 - `JWT_PRIVATE_KEY`
 - `JWT_PUBLIC_KEY`
 
-`FRONTEND_ORIGIN` accepts a comma-separated allowlist. In `NODE_ENV=development`,
-the backend also accepts the Vite dev server defaults `http://localhost:4021`
-and `http://127.0.0.1:4021`.
+Notes:
 
-When running through Docker Compose, the backend receives its environment from the root `docker-compose.yml`. When running the backend directly, `src/configs/env.config.ts` loads the root `.env` file explicitly.
+- `FRONTEND_ORIGIN` accepts a comma-separated allowlist
+- In `NODE_ENV=development`, `http://localhost:4021` and `http://127.0.0.1:4021` are accepted automatically
+- In Docker, environment values come from the root `docker-compose.yml`
 
-For VPS deployment, use a separate uncommitted `.env.production` with production origins, fresh JWT keys, and strong PostgreSQL credentials.
-
-## Local Development
+## How to Run
 
 Start PostgreSQL from the repository root:
 
@@ -64,19 +64,18 @@ Then run the backend:
 ```bash
 cd backend
 bun install
+bun run db:generate
 bun run db:push
 bun run dev
 ```
 
-The backend runs at:
+Development URL:
 
 ```text
 http://localhost:9173
 ```
 
-The public Docker application should call the backend through `/api/*` via the HTTPS reverse proxy at `https://localhost`.
-
-Local development uses the same root `docker-compose.yml` as the full stack. PostgreSQL is published to `127.0.0.1:5532` for the backend running outside Docker.
+In the Docker stack, the public app should call the backend through `/api/*` via the Caddy reverse proxy at `https://localhost`.
 
 ## API Routes
 
@@ -86,13 +85,17 @@ The backend is mounted under `/api`.
 POST /api/auth/signup
 POST /api/auth/signin
 GET  /api/auth/me
+GET  /api/contacts
+POST /api/conversations
+GET  /api/conversations/{conversationId}/messages
+GET  /api/ws
 ```
 
-`GET /api/auth/me` requires the `__Host-convo_access_token` cookie. Bearer tokens are still accepted for development tooling:
+Authentication behavior:
 
-```text
-Authorization: Bearer <access-token>
-```
+- Browser clients use the `__Host-convo_access_token` cookie
+- Non-browser tools may use `Authorization: Bearer <access-token>`
+- The WebSocket also accepts the access token through cookie, bearer header, subprotocol fallback, or query parameter
 
 ## Authentication Flow
 
@@ -110,27 +113,26 @@ Sign-in:
 1. The backend looks up the user by email.
 2. The backend verifies the submitted password against the stored salted scrypt hash.
 3. The backend sets a new signed JWT access token in an `HttpOnly` cookie.
+4. The backend returns sanitized user data and encrypted private-key metadata.
 
-Protected route access:
+Protected access:
 
-1. The browser sends the JWT in the `HttpOnly` `__Host-convo_access_token` cookie.
-2. The auth middleware verifies the token with `JWT_PUBLIC_KEY`.
-3. The middleware allows ES256 application tokens only.
-4. The decoded token payload is attached to the request context.
+1. The browser sends the JWT in the `HttpOnly` cookie.
+2. The backend verifies the token with `JWT_PUBLIC_KEY`.
+3. Only ES256 application tokens are accepted.
+4. The decoded authentication payload is attached to the request context.
 
-Cookies are allowed by the assignment, but are not required. This backend currently uses Bearer JWT authentication.
-
-Planned chat security:
+## Secure Messaging Flow
 
 1. The backend returns peer public keys and conversation metadata.
 2. The client derives ECDH and HKDF chat keys in the browser.
-3. The backend receives only ciphertext, IV, MAC, sender/receiver IDs, and timestamps.
+3. The backend receives only ciphertext, IV, MAC, sender or receiver IDs, and timestamps.
 4. The backend stores encrypted envelopes and relays them over WebSocket.
 5. The backend never receives plaintext messages, ECDH shared secrets, AES keys, or HMAC keys.
 
 ## JWT Library
 
-The custom JWT implementation is located in:
+The custom JWT implementation is in:
 
 ```text
 src/lib/jwt.ts
@@ -142,18 +144,13 @@ It implements:
 - `verify`
 - ES256, ES384, and ES512
 - Base64url compact serialization
-- RFC 7519 section 7.2 validation behavior relevant to JWS
 - Registered claim validation for `iss`, `sub`, `aud`, `exp`, `nbf`, `iat`, and `jti`
 
-Application auth uses ES256 only even though the library supports all three required algorithms.
-
-JWT unit tests are located in:
+JWT unit tests are in:
 
 ```text
 src/lib/jwt.test.ts
 ```
-
-They use Node.js `node:test`, which satisfies the assignment bonus because the unit test framework is free-choice.
 
 ## Scripts
 
@@ -176,24 +173,13 @@ Prisma schema and migrations are stored in:
 prisma/
 ```
 
-The main user table stores:
+Main tables:
 
-- email
-- password hash
-- password salt
-- ECDH public key
-- encrypted ECDH private key
-- private-key IV
-- private-key salt
-- private-key KDF metadata
-- private-key cipher metadata
+- `User`: email, password hash, password salt, public key, encrypted private key, private-key metadata, timestamps
+- `Conversation`: ordered one-to-one user pair, HKDF salt, timestamps
+- `Message`: conversation ID, sender ID, receiver ID, ciphertext, IV, MAC, algorithm metadata, timestamp
 
-Planned chat tables:
-
-- `Conversation`: ordered user pair, public HKDF salt, timestamps.
-- `Message`: conversation ID, sender ID, receiver ID, ciphertext, IV, MAC, algorithm metadata, timestamp.
-
-No plaintext message column should be added.
+No plaintext message column is stored.
 
 ## Source Layout
 
@@ -208,9 +194,10 @@ src/
   routes/         OpenAPI route definitions
   types/          Zod schemas and shared backend types
   utils/          Shared helpers
-  index.ts        Server entrypoint
+  ws/             Chat WebSocket authentication and event handling
+  index.ts        Bun server entrypoint
 ```
 
 ## Production Notes
 
-The backend container exposes port `9173` only inside Docker networking. The root reverse proxy is the public entrypoint and forwards `/api/*` requests to the backend.
+The backend container runs on the Bun runtime and exposes port `9173` only inside Docker networking. Caddy is the public entrypoint and forwards `/api/*` requests to the backend.

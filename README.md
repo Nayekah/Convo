@@ -1,14 +1,14 @@
 # Convo
 
-> Tugas 3 II4021 Kriptografi 2026
+> Secure web chat with end-to-end encrypted messaging
 
 <h3 align="center">End-to-end encrypted web chat with JWT authentication, ECDH key exchange, and AES-based private messaging</h3>
 
 ## Overview
 
-`Convo` is a web-based secure messaging application. The project combines user authentication, client-side cryptographic key preparation, encrypted private-key storage, and a production-oriented container setup behind a reverse proxy.
+`Convo` is a secure web-based messaging application focused on private one-to-one communication, user authentication, and a full-stack deployment setup that can run locally or in Docker.
 
-The current implementation includes the landing page, sign-up flow, sign-in flow, custom JWT authentication with an HttpOnly cookie, encrypted ECDH private-key storage, PostgreSQL persistence, backend contact/conversation APIs, encrypted message persistence, backend WebSocket delivery, Docker orchestration, and JWT unit tests. Frontend chat key derivation, encrypted messaging UI, MAC verification, and WebSocket integration are planned next.
+It consists of a landing page, sign-up and sign-in flow, contact list, one-to-one chat, encrypted message history, real-time message delivery, and the supporting backend and database services behind them.
 
 ## Tech Stack and Languages
 
@@ -20,9 +20,9 @@ The current implementation includes the landing page, sign-up flow, sign-in flow
 
 <p align="center">
   <a href="./frontend">Frontend</a>
-  ·
+  •
   <a href="./backend">Backend</a>
-  ·
+  •
   <a href="./LICENSE">License</a>
 </p>
 
@@ -70,11 +70,9 @@ The current implementation includes the landing page, sign-up flow, sign-in flow
 
 ## About Convo
 
-`Convo` is designed around a server-assisted but privacy-oriented messaging model. The server authenticates users and stores encrypted key material, while cryptographic operations for communication are designed to happen on the client side. During registration, the frontend generates an ECDH key pair with the Web Crypto API. The private key is encrypted before being sent to the backend, and the backend stores only the encrypted private key, public key, and recovery metadata.
+`Convo` is designed as a privacy-oriented chat platform where users can communicate directly through a simple web interface. The system handles account registration, authentication, contact discovery, conversation management, and real-time chat in a single integrated application.
 
-Authentication uses a custom JWT library implemented in the backend. Tokens are encoded as JWS compact serialization and signed with ECDSA. The JWT library supports ES256, ES384, and ES512 for assignment compliance, while application login tokens use ES256 only. Browser authentication uses a `__Host-convo_access_token` HttpOnly cookie set with `hono/cookie`; backend middleware reads that cookie first and keeps `Authorization: Bearer <token>` as a compatibility fallback for non-browser tools.
-
-Password verification uses scrypt with a unique per-user salt. Private ECDH key protection uses PBKDF2-SHA-256 in the browser to derive an AES-256-GCM wrapping key from the user's password. Planned chat encryption uses ECDH P-256, HKDF-SHA-256 for chat key separation, AES-256-GCM for message encryption, and HMAC-SHA-256 for MAC.
+The project is built with a split frontend-backend architecture. The frontend provides the user experience for authentication and chatting, while the backend manages data storage, API access, and WebSocket communication. The overall goal is to provide a secure and practical messaging application that matches the assignment requirements while remaining deployable with a modern container-based setup.
 
 ---
 
@@ -83,19 +81,24 @@ Password verification uses scrypt with a unique per-user salt. Private ECDH key 
 - Landing page
 - Sign-up page
 - Sign-in page
+- Contact list and one-to-one chat page
 - Salted scrypt password hashing
 - Custom JWT sign and verify library
 - ES256, ES384, and ES512 support
-- HttpOnly JWT access cookie with `hono/cookie`
+- `HttpOnly` JWT access cookie with `hono/cookie`
 - JWT unit tests with Node.js `node:test`
 - Client-side ECDH key generation
 - Client-side private-key encryption before upload with PBKDF2-SHA-256 and AES-256-GCM
+- Client-side chat key derivation with ECDH and HKDF-SHA-256
+- Encrypted message history decryption in the browser
+- HMAC-SHA-256 verification before message decryption
+- Unlock flow for reloading the encrypted private key after refresh
 - Contact list and one-to-one conversation REST APIs
 - Encrypted message history API
 - Backend WebSocket endpoint for encrypted message persistence and broadcast
 - PostgreSQL persistence through Prisma
 - Docker Compose full-stack setup
-- Caddy reverse proxy with HTTPS
+- Caddy reverse proxy with HTTPS and static frontend serving
 - Production-oriented port isolation
 - Husky pre-commit and pre-push quality gates
 
@@ -105,9 +108,9 @@ Password verification uses scrypt with a unique per-user salt. Private ECDH key 
 
 ```text
 Convo/
-  backend/          Hono API, Prisma, PostgreSQL, JWT library
+  backend/          Bun + Hono API, Prisma, PostgreSQL, JWT library
   frontend/         React, Vite, TypeScript web client
-  reverse-proxy/    Caddy public HTTPS entrypoint
+  reverse-proxy/    Caddy public HTTPS entrypoint and frontend static serving
   docker-compose.yml
   .env.example
 ```
@@ -128,6 +131,14 @@ Detailed component documentation:
 - Docker
 - Docker Compose
 
+### Dependencies
+
+- PostgreSQL
+- Caddy
+- Prisma Client
+- React Router
+- Zod
+
 > [!IMPORTANT]
 > Copy `.env.example` to `.env` before running the application. Do not commit `.env` or real deployment secrets.
 
@@ -141,6 +152,7 @@ cp .env.example .env
 
 Before deploying publicly, update at least:
 
+- `NODE_ENV`
 - `PUBLIC_ORIGIN`
 - `FRONTEND_ORIGIN`
 - `POSTGRES_PASSWORD`
@@ -149,10 +161,7 @@ Before deploying publicly, update at least:
 
 The repository uses a single root `.env` file as the source of truth for Docker and local development.
 
-`FRONTEND_ORIGIN` may be a comma-separated allowlist. During local backend
-development, `http://localhost:4021` and `http://127.0.0.1:4021` are accepted
-automatically so the Vite frontend can sign up and sign in without hitting the
-origin guard.
+`FRONTEND_ORIGIN` may be a comma-separated allowlist. During local backend development, `http://localhost:4021` and `http://127.0.0.1:4021` are accepted automatically so the Vite frontend can sign up and sign in without hitting the origin guard.
 
 ---
 
@@ -181,15 +190,15 @@ docker compose down
 Default access points:
 
 - Public application: `https://localhost`
-- Backend: internal Docker network only
-- PostgreSQL: internal Docker network only
+- Backend: internal Docker network, with `127.0.0.1:9173` published for host-side debugging
+- PostgreSQL: internal Docker network, with `127.0.0.1:5532` published for local development
 
 Public routing:
 
-- `/` -> frontend static files served by Caddy
-- `/api/*` -> backend API
+- `/` -> frontend static files served directly by Caddy
+- `/api/*` -> Bun backend API
 
-The backend and database are not published to the host by default. The reverse proxy is the only public entrypoint.
+The reverse proxy is the public entrypoint. The backend and database stay on the internal Docker network for the normal deployment path.
 
 The Docker reverse proxy uses Caddy for both HTTPS termination and static frontend delivery. For local development, Caddy serves `https://localhost` with its internal development CA. Browsers may warn until the Caddy local root CA is trusted.
 
@@ -199,9 +208,9 @@ For a real VPS with a trusted certificate, keep the same `docker-compose.yml` an
 
 Prerequisites:
 
-- A domain name with DNS `A` or `AAAA` records pointing to the VPS public IP.
-- Public inbound ports `80` and `443` open in the VPS firewall/security group.
-- Docker and Docker Compose installed on the VPS.
+- A domain name with DNS `A` or `AAAA` records pointing to the VPS public IP
+- Public inbound ports `80` and `443` open in the VPS firewall or security group
+- Docker and Docker Compose installed on the VPS
 
 Create the production environment file:
 
@@ -212,6 +221,7 @@ cp .env.example .env
 Set at least:
 
 ```env
+NODE_ENV=production
 PUBLIC_DOMAIN=chat.example.com
 PUBLIC_ORIGIN=https://chat.example.com
 FRONTEND_ORIGIN=https://chat.example.com
@@ -231,7 +241,7 @@ Caddy stores ACME certificates in the `convo_caddy_data` Docker volume, so certi
 
 ### Local Development
 
-Copy .env.example into .env
+Copy `.env.example` into `.env`.
 
 Start PostgreSQL:
 
@@ -244,6 +254,7 @@ Run the backend:
 ```bash
 cd backend
 bun install
+bun run db:generate
 bun run db:push
 bun run dev
 ```
@@ -307,55 +318,57 @@ bun run test:jwt
 
 ### Authentication
 
-- User registers with email and password.
-- Frontend generates an ECDH key pair.
-- Frontend derives a wrapping key with PBKDF2-SHA-256.
-- Frontend encrypts the exported private key using AES-256-GCM.
-- Backend stores the public key, encrypted private key, password hash, salts, and metadata.
-- Backend issues a signed JWT access token in an `HttpOnly` cookie.
-- Backend hashes the password with scrypt and returns sanitized user data; the JWT itself stays in the cookie rather than the JSON body.
+- User registers with email and password
+- Frontend generates an ECDH key pair
+- Frontend derives a wrapping key with PBKDF2-SHA-256
+- Frontend encrypts the exported private key using AES-256-GCM
+- Backend stores the public key, encrypted private key, password hash, salts, and metadata
+- Backend issues a signed JWT access token in an `HttpOnly` cookie
+- Backend hashes the password with scrypt and returns sanitized user data; the JWT itself stays in the cookie rather than the JSON body
 
 ### Login
 
-- User submits email and password.
-- Backend verifies the salted scrypt password hash.
-- Backend issues a signed JWT access token in an `HttpOnly` cookie.
-- Backend returns sanitized user data and encrypted private-key metadata for local private-key decryption.
+- User submits email and password
+- Backend verifies the salted scrypt password hash
+- Backend issues a signed JWT access token in an `HttpOnly` cookie
+- Backend returns sanitized user data and encrypted private-key metadata for local private-key decryption
 
 ### Protected API Access
 
-- Browser sends the `HttpOnly` auth cookie with API requests.
-- Backend verifies the JWT signature and registered claims.
-- Backend accepts ES256 application tokens only.
-- Protected route handlers receive the decoded authentication payload.
-- Non-browser tools may use `Authorization: Bearer <token>` as a compatibility fallback.
+- Browser sends the `HttpOnly` auth cookie with API requests
+- Backend verifies the JWT signature and registered claims
+- Backend accepts ES256 application tokens only
+- Protected route handlers receive the decoded authentication payload
+- Non-browser tools may use `Authorization: Bearer <token>` as a compatibility fallback
 
-### Backend Secure Messaging
+### Secure Messaging
 
-- The backend exposes contacts, conversation creation/lookup, and encrypted message history APIs.
-- The backend WebSocket endpoint stores and broadcasts encrypted message envelopes.
-- The server stores ciphertext, IV, MAC, algorithm, sender, receiver, conversation ID, and sent timestamp.
-- The server never decrypts messages and does not hold plaintext message keys.
+- Frontend loads contacts and creates or reuses one-to-one conversations
+- Each chat pair derives a shared secret with ECDH
+- HKDF-SHA-256 separates the shared secret into an AES-256-GCM message key and an HMAC-SHA-256 MAC key
+- AES-256-GCM is used for message encryption and decryption in the browser
+- HMAC-SHA-256 is verified before decrypting history or live WebSocket messages
+- The backend exposes contacts, conversation creation or lookup, encrypted message history APIs, and a WebSocket endpoint at `/api/ws`
+- The server stores ciphertext, IV, MAC, algorithm, sender, receiver, conversation ID, and sent timestamp
+- The server never decrypts messages and does not hold plaintext message keys, ECDH shared secrets, or derived chat keys
 
-### Planned Frontend Secure Messaging
+### Private-Key Unlock Flow
 
-- Each chat pair derives a shared secret with ECDH.
-- The shared secret is processed with HKDF.
-- HKDF separates the shared secret into an AES-256-GCM message key and an HMAC-SHA-256 MAC key.
-- AES-256-GCM is used for message encryption and decryption.
-- HMAC-SHA-256 is verified before decryption for the MAC bonus.
+- The decrypted private key is kept only in browser memory
+- User identity and encrypted private-key metadata are stored in `sessionStorage`
+- After reload, the user may need to re-enter their password so the private key can be decrypted locally again
 
 ---
 
 ## Security Notes
 
-- Do not commit `.env`.
-- Do not commit real JWT private keys.
-- Store browser JWTs only in the `__Host-convo_access_token` HttpOnly cookie instead of browser-readable storage.
-- Use credentialed frontend requests so the browser sends the auth cookie.
-- Generate fresh keys for every deployment.
-- Keep backend and PostgreSQL on the internal Docker network for public deployments.
-- Use HTTPS in front of the reverse proxy when deployed to the internet.
+- Do not commit `.env`
+- Do not commit real JWT private keys
+- Store browser JWTs only in the `__Host-convo_access_token` `HttpOnly` cookie instead of browser-readable storage
+- Use credentialed frontend requests so the browser sends the auth cookie
+- Generate fresh keys for every deployment
+- Keep backend and PostgreSQL on the internal Docker network for public deployments
+- Use HTTPS in front of the reverse proxy when deployed to the internet
 
 ---
 
@@ -373,5 +386,5 @@ Mahesa Satria Prayata <18223082@std.stei.itb.ac.id>
 <br/>
 
 <div align="center">
-II4021 Kriptografi • 2026 • Convo
+Convo • 2026
 </div>
