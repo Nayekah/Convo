@@ -2,7 +2,7 @@ import { LogOut, MessageSquarePlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { ApiError } from '../lib/api';
+import { ApiError, authApi } from '../lib/api';
 import { chatApi } from '../lib/chat-api';
 import {
   clearSession,
@@ -78,9 +78,15 @@ export const ContactSidebar = () => {
     }
   };
 
-  const handleSignOut = () => {
-    clearSession();
-    navigate('/signin');
+  const handleSignOut = async () => {
+    try {
+      await authApi.signOut();
+    } catch {
+      // Clear local session even if the cookie is already missing or invalid.
+    } finally {
+      clearSession();
+      navigate('/signin');
+    }
   };
 
   return (
